@@ -63,17 +63,18 @@ export function activate(context: vscode.ExtensionContext) {
       }));
 
       const selected = await vscode.window.showQuickPick<ViolationQuickPickItem>(items, {
-        placeHolder: `Select a violation to auto-fix (${fixableViolations.length} available)`,
+        placeHolder: `Select violations to auto-fix (${fixableViolations.length} available)`,
         matchOnDescription: true,
-        matchOnDetail: true
+        matchOnDetail: true,
+        canPickMany: true
       });
 
-      if (!selected) {
+      if (!selected || selected.length === 0) {
         return;
       }
 
-      const v = selected.violation;
-      await applyFix(v, codeFileUri);
+      const violationsToFix = selected.map(s => s.violation);
+      await applyFixes(violationsToFix, codeFileUri);
 
     } catch (err) {
       vscode.window.showErrorMessage(`Failed to process report: ${err instanceof Error ? err.message : String(err)}`);
@@ -83,58 +84,64 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(disposable);
 }
 
-async function applyFix(violation: any, fileUri: vscode.Uri) {
-  const snippet = violation.htmlSnippet;
-  const fix = violation.aiRemediation.remediatedCode;
-
-  if (!snippet || !fix) {
-    vscode.window.showErrorMessage('Missing snippet or remediated code for this violation.');
-    return;
-  }
-
+async function applyFixes(violations: any[], fileUri: vscode.Uri) {
   try {
     const document = await vscode.workspace.openTextDocument(fileUri);
-    const text = document.getText();
-    const trimSnippet = snippet.trim();
+    let text = document.getText();
+    const edit = new vscode.WorkspaceEdit();
     
-    // Create a flexible regex that ignores differences in whitespace/newlines
-    const parts = trimSnippet.split(/\s+/);
-    const escapedParts = parts.map(p => p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
-    const pattern = escapedParts.join('\\s+');
-    const regex = new RegExp(pattern, 'm');
-    
-    // Try to find the substring using flexible matching
-    const match = text.match(regex);
-    
-    if (match && match.index !== undefined) {
-      const matchLength = match[0].length;
-      const startPos = document.positionAt(match.index);
-      const endPos = document.positionAt(match.index + matchLength);
-      const range = new vscode.Range(startPos, endPos);
+    let appliedCount = 0;
+    const failedViolations: any[] = [];
+
+    // Process each violation one by one and accumulate edits
+    for (const violation of violations) {
+      const snippet = violation.htmlSnippet;
+      const fix = violation.aiRemediation?.remediatedCode;
+
+      if (!snippet || !fix) {
+        failedViolations.push(violation);
+        continue;
+      }
+
+      const trimSnippet = snippet.trim();
       
-      const edit = new vscode.WorkspaceEdit();
-      edit.replace(fileUri, range, fix);
+      // Create a flexible regex that ignores differences in whitespace/newlines
+      const parts = trimSnippet.split(/\s+/);
+      const escapedParts = parts.map((p: string) => p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+      const pattern = escapedParts.join('\\s+');
+      const regex = new RegExp(pattern, 'm');
       
+      const match = text.match(regex);
+      
+      if (match && match.index !== undefined) {
+        const matchLength = match[0].length;
+        const startPos = document.positionAt(match.index);
+        const endPos = document.positionAt(match.index + matchLength);
+        const range = new vscode.Range(startPos, endPos);
+        
+        edit.replace(fileUri, range, fix);
+        appliedCount++;
+      } else {
+        failedViolations.push(violation);
+      }
+    }
+
+    if (appliedCount > 0) {
       const success = await vscode.workspace.applyEdit(edit);
       if (success) {
-        vscode.window.showInformationMessage(`Successfully applied fix for ${violation.ruleId} in ${vscode.workspace.asRelativePath(fileUri)}`);
-        return;
+        vscode.window.showInformationMessage(`Successfully applied ${appliedCount} fixes in ${vscode.workspace.asRelativePath(fileUri)}`);
+      } else {
+        vscode.window.showErrorMessage(`Failed to write edits to the editor buffer.`);
       }
     }
     
-    // If we reach here, the snippet wasn't found in the explicitly targeted file
-    vscode.window.showWarningMessage(
-      `Could not automatically locate the exact code snippet in the selected file. The file may have changed or the snippet might be broken across multiple lines.`
-    );
+    // If any failed to locate, warn the user
+    if (failedViolations.length > 0) {
+      vscode.window.showWarningMessage(
+        `${failedViolations.length} violations could not be pinpointed reliably. You may need to patch them manually.`
+      );
+    }
     
-    // Copy fix to clipboard
-    vscode.env.clipboard.writeText(fix);
-    vscode.window.showInformationMessage('The remediated code has been copied to your clipboard.', 'View AI Explanation').then(selection => {
-      if (selection === 'View AI Explanation') {
-        vscode.window.showInformationMessage(violation.aiRemediation.explanation, { modal: true });
-      }
-    });
-
   } catch (e) {
     vscode.window.showErrorMessage(`Error reading the target file: ${e instanceof Error ? e.message : String(e)}`);
   }
