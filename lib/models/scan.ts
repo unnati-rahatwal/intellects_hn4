@@ -39,6 +39,9 @@ export interface IScan extends Document {
     recommendations: string[];
     generatedAt: Date | null;
   } | null;
+  videoUrl?: string;
+  videoGeneratedAt?: Date;
+  videoGenerationStatus?: 'PENDING' | 'GENERATING' | 'COMPLETED' | 'FAILED';
 }
 
 const scanSchema = new Schema<IScan>(
@@ -90,6 +93,13 @@ const scanSchema = new Schema<IScan>(
       keyFindings: [{ type: String }],
       recommendations: [{ type: String }],
       generatedAt: { type: Date, default: null },
+    },
+    videoUrl: { type: String },
+    videoGeneratedAt: { type: Date },
+    videoGenerationStatus: {
+      type: String,
+      enum: ['PENDING', 'GENERATING', 'COMPLETED', 'FAILED'],
+      default: 'PENDING',
     },
   },
   { timestamps: true }

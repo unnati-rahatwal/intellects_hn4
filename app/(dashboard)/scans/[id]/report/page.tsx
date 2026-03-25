@@ -286,6 +286,9 @@ export default function DetailedReportPage({ params }: { params: Promise<{ id: s
   const [data, setData] = useState<ScanReport | null>(null);
   const [loading, setLoading] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [videoGenerating, setVideoGenerating] = useState(false);
+  const [videoStatus, setVideoStatus] = useState<'PENDING' | 'GENERATING' | 'COMPLETED' | 'FAILED' | null>(null);
 
   useEffect(() => {
     async function fetchReport() {
@@ -301,6 +304,16 @@ export default function DetailedReportPage({ params }: { params: Promise<{ id: s
         
         const json = await res.json();
         setData(json);
+        
+        // Load existing video URL
+        const videoRes = await fetch(`/api/scans/${id}/video`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (videoRes.ok) {
+          const videoData = await videoRes.json();
+          if (videoData.videoUrl) setVideoUrl(videoData.videoUrl);
+          if (videoData.videoGenerationStatus) setVideoStatus(videoData.videoGenerationStatus);
+        }
       } catch (err) {
         console.error(err);
       } finally {
@@ -309,6 +322,42 @@ export default function DetailedReportPage({ params }: { params: Promise<{ id: s
     }
     fetchReport();
   }, [id, router]);
+
+  const handleGenerateVideo = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        router.push('/login');
+        return;
+      }
+
+      setVideoGenerating(true);
+      setVideoStatus('GENERATING');
+
+      const res = await fetch(`/api/scans/${id}/video`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (!res.ok) {
+        const error = await res.json();
+        alert(`Video generation failed: ${error.error || 'Unknown error'}`);
+        setVideoStatus('FAILED');
+        setVideoGenerating(false);
+        return;
+      }
+
+      const result = await res.json();
+      setVideoUrl(result.videoUrl);
+      setVideoStatus('COMPLETED');
+      setVideoGenerating(false);
+    } catch (err) {
+      console.error('Video generation error:', err);
+      alert('Failed to generate video');
+      setVideoStatus('FAILED');
+      setVideoGenerating(false);
+    }
+  };
 
   if (loading || !data) {
     return (
@@ -431,6 +480,124 @@ export default function DetailedReportPage({ params }: { params: Promise<{ id: s
         <ScoreGauge score={scan.accessibilityScore || 0} label="Accessibility Health" icon={Activity} />
         <ScoreGauge score={Math.round(perfScore)} label="Performance Profile" icon={Zap} />
         <ScoreGauge score={secScore} label="Security Posture" icon={Shield} />
+      </div>
+
+      {/* Executive Video Report */}
+      <div className="glass-card bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
+        <div className="bg-linear-to-r from-blue-600 via-purple-600 to-pink-600 h-1" />
+        <div className="p-6">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-blue-500/20 flex items-center justify-center">
+                <div className="w-6 h-6 text-blue-400">▶</div>
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-white">Executive Video Summary</h2>
+                <p className="text-xs text-blue-400 font-medium">AI-generated video report narrated by professional avatar</p>
+              </div>
+            </div>
+            {videoUrl && videoStatus === 'COMPLETED' && !videoGenerating && (
+              <span className="flex items-center gap-1 text-xs font-medium text-green-400 bg-green-500/10 px-3 py-1.5 rounded-full">
+                <CheckCircle className="w-3 h-3" /> Ready
+              </span>
+            )}
+          </div>
+
+          {videoUrl && videoStatus === 'COMPLETED' ? (
+            <div className="space-y-4">
+              <div className="aspect-video bg-black/50 rounded-lg overflow-hidden border border-slate-700">
+                {/\.mp4(\?|$)/i.test(videoUrl) ? (
+                  <video
+                    key={videoUrl}
+                    src={videoUrl}
+                    controls
+                    playsInline
+                    preload="metadata"
+                    className="w-full h-full bg-black"
+                  >
+                    Your browser does not support embedded video playback.
+                  </video>
+                ) : (
+                  // eslint-disable-next-line jsx-a11y/iframe-has-title
+                  <iframe
+                    src={videoUrl}
+                    className="w-full h-full"
+                    allow="autoplay; encrypted-media"
+                    allowFullScreen
+                  />
+                )}
+              </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={handleGenerateVideo}
+                  disabled={videoGenerating}
+                  className="flex-1 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-white rounded-lg font-medium transition-colors text-sm flex items-center justify-center gap-2"
+                >
+                  <Zap className="w-4 h-4" /> Regenerate Video
+                </button>
+                <a
+                  href={videoUrl}
+                  download
+                  className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-lg font-medium transition-colors text-sm flex items-center gap-2"
+                >
+                  <Download className="w-4 h-4" /> Download
+                </a>
+              </div>
+            </div>
+          ) : videoGenerating || videoStatus === 'GENERATING' ? (
+            <div className="flex flex-col items-center justify-center py-16 gap-4">
+              <div className="relative w-16 h-16">
+                <div className="absolute inset-0 border-4 border-slate-700 rounded-full" />
+                <div className="absolute inset-0 border-4 border-t-blue-500 border-r-purple-500 border-b-pink-500 border-l-blue-400 rounded-full animate-spin" />
+              </div>
+              <div className="text-center">
+                <p className="text-slate-200 font-medium">Generating Executive Video...</p>
+                <p className="text-xs text-slate-500 mt-1">This may take 30-120 seconds</p>
+                <div className="text-xs text-slate-400 mt-2 space-y-1">
+                  <p>→ Script generation in progress...</p>
+                  <p>→ Audio synthesis in progress...</p>
+                  <p>→ Avatar video creation in progress...</p>
+                </div>
+              </div>
+            </div>
+          ) : videoStatus === 'FAILED' ? (
+            <div className="flex flex-col items-center justify-center py-12 gap-4 bg-red-500/10 border border-red-500/20 rounded-lg">
+              <AlertTriangle className="w-10 h-10 text-red-400" />
+              <div className="text-center">
+                <p className="text-slate-200 font-medium">Video Generation Failed</p>
+                <p className="text-xs text-slate-400 mt-2">Please ensure AI summary is complete and try again</p>
+              </div>
+              <button
+                onClick={handleGenerateVideo}
+                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors text-sm flex items-center gap-2 mt-2"
+              >
+                <Zap className="w-4 h-4" /> Retry
+              </button>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-12 gap-4">
+              <div className="w-12 h-12 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-400">
+                ▶
+              </div>
+              <div className="text-center">
+                <p className="text-slate-200 font-medium">No Video Generated Yet</p>
+                <p className="text-xs text-slate-400 mt-1">Create a professional executive summary video using AI</p>
+              </div>
+              <button
+                onClick={handleGenerateVideo}
+                disabled={videoGenerating || !scan.aiSummary?.executiveSummary}
+                className="px-6 py-2.5 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors text-sm flex items-center gap-2"
+              >
+                <Zap className="w-4 h-4" /> Generate Executive Video
+              </button>
+              {!scan.aiSummary?.executiveSummary && (
+                <p className="text-xs text-amber-400 text-center mt-2">
+                  ✓ Waiting for AI summary to complete before video generation
+                </p>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Main Grid: AI Summary + Violations Chart */}
