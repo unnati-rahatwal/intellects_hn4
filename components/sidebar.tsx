@@ -12,7 +12,7 @@ import {
   Settings,
   HelpCircle
 } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -29,11 +29,16 @@ export default function Sidebar() {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
 
+  useEffect(() => {
+    const width = collapsed ? '72px' : '260px'; // Matching globals.css
+    document.documentElement.style.setProperty('--current-sidebar-width', width);
+  }, [collapsed]);
+
   return (
     <aside
       className="fixed top-0 left-0 h-full z-50 flex flex-col transition-all duration-300 bg-[#0A0F1C] border-r border-white/5 shadow-2xl"
       style={{
-        width: collapsed ? '80px' : 'var(--sidebar-width)',
+        width: 'var(--current-sidebar-width, 260px)',
       }}
     >
       {/* Branding Area */}

@@ -63,7 +63,7 @@ export default function Navbar() {
           : 'bg-transparent border-transparent py-5'
       }`}
       style={{ 
-        left: isDashboard ? 'var(--sidebar-width)' : '0',
+        left: isDashboard ? 'var(--current-sidebar-width, 260px)' : '0',
       }}
     >
       <div className="max-w-7xl mx-auto px-6 flex items-center justify-between gap-4">
