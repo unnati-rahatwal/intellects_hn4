@@ -140,7 +140,7 @@ export async function discoverRoutes(
           });
         }, baseOrigin);
 
-        spaRoutes.forEach((url) => discovered.add(url));
+        spaRoutes.forEach((url: string) => discovered.add(url));
       } catch {
         // SPA detection failed, no problem
       }

@@ -159,7 +159,7 @@ export async function runScan(
               cssSelector: Array.isArray(node.target) ? node.target.join(' ') : String(node.target),
               boundingBox,
               screenshotPath: undefined,
-              wcagCriteria: violation.tags?.filter(t => t.startsWith('wcag')) || [],
+              wcagCriteria: violation.tags?.filter((t: string) => t.startsWith('wcag')) || [],
               tags: violation.tags || [],
             });
 
@@ -187,7 +187,7 @@ export async function runScan(
         // Vision deficiency screenshots
         if (options.visionEmulation && violations.length > 0) {
           try {
-            await captureVisionDeficiencyScreenshots(page, violations.slice(0, 3));
+            await captureVisionDeficiencyScreenshots(page, violations.slice(0, 3) as any);
           } catch {
             // Non-critical, continue
           }
