@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Navbar from "@/components/navbar";
+import ChatBot from "@/components/ChatBot";
 
 
 const inter = Inter({
@@ -30,6 +31,7 @@ export default function RootLayout({
       <body className="antialiased font-sans bg-[#0A0F1C] text-slate-300">
         <Navbar />
         {children}
+        <ChatBot />
       </body>
     </html>
   );
