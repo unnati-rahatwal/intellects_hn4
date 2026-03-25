@@ -1,74 +1,75 @@
-import { Worker } from 'bullmq';
-import IORedis from 'ioredis';
 import mongoose from 'mongoose';
+import { connectDB } from './lib/db';
+import { Scan } from './lib/models/scan';
 import { runScan } from './lib/scanner/index';
 
-const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/a11y-audit';
+const POLL_INTERVAL = 3000; // 3 seconds
+const CONCURRENCY_LIMIT = 2; // Max 2 concurrent scans
+
+let activeScans = 0;
+
+async function pollJobs() {
+  if (activeScans >= CONCURRENCY_LIMIT) {
+    return;
+  }
+
+  try {
+    // Atomically pick up a PENDING job
+    const job = await Scan.findOneAndUpdate(
+      { status: 'PENDING' },
+      { 
+        $set: { 
+          status: 'PROCESSING',
+          startedAt: new Date()
+        } 
+      },
+      { sort: { createdAt: 1 }, new: true }
+    );
+
+    if (job) {
+      activeScans++;
+      console.log(`\n🔍 Found PENDING scan: ${job._id}`);
+      console.log(`   URLs: ${job.targetUrls.join(', ')}`);
+
+      // Run scan in background (not awaiting, to allow next polling cycle)
+      runScan(job._id.toString(), job.targetUrls, job.options)
+        .then(() => {
+          console.log(`✅ Scan ${job._id} completed successfully`);
+        })
+        .catch((error) => {
+          console.error(`❌ Scan ${job._id} failed:`, error);
+        })
+        .finally(() => {
+          activeScans--;
+        });
+    }
+  } catch (err) {
+    console.error('Error polling jobs:', err);
+  }
+}
 
 async function main() {
   console.log('🔄 Connecting to MongoDB...');
-  await mongoose.connect(MONGODB_URI);
+  await connectDB();
   console.log('✅ MongoDB connected');
 
-  const connection = new IORedis(REDIS_URL, {
-    maxRetriesPerRequest: null,
-    enableReadyCheck: false,
-  });
+  console.log(`🚀 Worker started. Polling for accessibility audit jobs every ${POLL_INTERVAL/1000}s...`);
+  console.log(`📡 Concurrency limit: ${CONCURRENCY_LIMIT} active scans\n`);
 
-  console.log('✅ Redis connected');
+  // Polling loop
+  setInterval(pollJobs, POLL_INTERVAL);
 
-  const worker = new Worker(
-    'accessibility-audits',
-    async (job) => {
-      console.log(`\n🔍 Processing scan job: ${job.id}`);
-      console.log(`   Scan ID: ${job.data.scanId}`);
-      console.log(`   URLs: ${job.data.urls.join(', ')}`);
-
-      try {
-        await runScan(job.data.scanId, job.data.urls, job.data.options);
-        console.log(`✅ Scan ${job.data.scanId} completed successfully`);
-      } catch (error) {
-        console.error(`❌ Scan ${job.data.scanId} failed:`, error);
-        throw error;
-      }
-    },
-    {
-      connection,
-      concurrency: 2, // Max 2 simultaneous Playwright instances
-      limiter: {
-        max: 5,
-        duration: 60000, // Max 5 scans per minute
-      },
-    }
-  );
-
-  worker.on('completed', (job) => {
-    console.log(`✅ Job ${job?.id} completed`);
-  });
-
-  worker.on('failed', (job, err) => {
-    console.error(`❌ Job ${job?.id} failed:`, err.message);
-  });
-
-  worker.on('error', (err) => {
-    console.error('Worker error:', err);
-  });
-
-  console.log('🚀 Worker started. Listening for accessibility audit jobs...\n');
+  // Initial poll
+  pollJobs();
 
   // Graceful shutdown
   process.on('SIGINT', async () => {
     console.log('\n🛑 Shutting down worker...');
-    await worker.close();
-    await connection.quit();
     await mongoose.disconnect();
     process.exit(0);
   });
 
   process.on('SIGTERM', async () => {
-    await worker.close();
-    await connection.quit();
     await mongoose.disconnect();
     process.exit(0);
   });
