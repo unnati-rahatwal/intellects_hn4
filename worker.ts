@@ -62,18 +62,26 @@ async function processAiSynthesis() {
     if (violationsToRemediate.length > 0) {
       console.log(`🛠️ [AI Catch-up] Remediating ${violationsToRemediate.length} violations in batch...`);
       try {
-        const inputs = violationsToRemediate.map(v => ({
-          id: v._id.toString(),
-          ruleId: v.ruleId,
-          failureSummary: v.failureSummary || v.description || '',
-          htmlSnippet: v.htmlSnippet || '',
-          description: v.description || ''
-        }));
+        const idMap = new Map<string, string>();
+        const inputs = violationsToRemediate.map((v, idx) => {
+          const fakeId = `v_${idx}`;
+          idMap.set(fakeId, v._id.toString());
+          return {
+            id: fakeId,
+            ruleId: v.ruleId,
+            failureSummary: v.failureSummary || v.description || '',
+            htmlSnippet: v.htmlSnippet || '',
+            description: v.description || ''
+          };
+        });
         
         const results = await generateBatchRemediations(inputs);
         
         for (const result of results) {
-          await Violation.findByIdAndUpdate(result.id, {
+          const actualId = idMap.get(result.id);
+          if (!actualId) continue;
+
+          await Violation.findByIdAndUpdate(actualId, {
             aiRemediation: {
               analysis: result.analysis,
               remediatedCode: result.remediatedCode,
@@ -84,15 +92,18 @@ async function processAiSynthesis() {
         }
         
         // Handle failed items (if model forgot to return them)
-        const successIds = results.map(r => r.id);
-        const failedIds = inputs.filter(i => !successIds.includes(i.id)).map(i => i.id);
+        const successFakeIds = results.map(r => r.id);
+        const failedActualIds = inputs
+          .filter(i => !successFakeIds.includes(i.id))
+          .map(i => idMap.get(i.id))
+          .filter((id): id is string => !!id);
         
-        if (failedIds.length > 0) {
-           await Violation.updateMany({ _id: { $in: failedIds } }, { 'aiRemediation.status': 'FAILED' });
-           console.warn(`⚠️ [AI Catch-up] ${failedIds.length} violations failed to remediate in batch.`);
+        if (failedActualIds.length > 0) {
+           await Violation.updateMany({ _id: { $in: failedActualIds } }, { 'aiRemediation.status': 'FAILED' });
+           console.warn(`⚠️ [AI Catch-up] ${failedActualIds.length} violations failed to remediate in batch.`);
         }
         
-        console.log(`✅ [AI Catch-up] Remediated ${successIds.length} violations successfully.`);
+        console.log(`✅ [AI Catch-up] Remediated ${successFakeIds.length} violations successfully.`);
         // Sleep 5 seconds to let API concurrency tokens reset fully
         await new Promise(r => setTimeout(r, 5000));
       } catch (err) {

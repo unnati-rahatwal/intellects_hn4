@@ -1,9 +1,23 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 
+interface ViolationQuickPickItem extends vscode.QuickPickItem {
+  violation: any;
+}
+
 export function activate(context: vscode.ExtensionContext) {
   const disposable = vscode.commands.registerCommand('accessiq.importReport', async () => {
-    // 1. Ask user to select a JSON file
+    // 1. Ask user to select the Target Code File to fix
+    const codeFileUri = await vscode.window.showOpenDialog({
+      canSelectMany: false,
+      openLabel: 'Select File to Fix (HTML/TSX/etc)'
+    });
+
+    if (!codeFileUri || codeFileUri.length === 0) {
+      return;
+    }
+
+    // 2. Ask user to select the JSON report file
     const fileUri = await vscode.window.showOpenDialog({
       canSelectMany: false,
       openLabel: 'Import AccessIQ Report',
@@ -37,14 +51,14 @@ export function activate(context: vscode.ExtensionContext) {
       }
 
       // Show quick pick
-      const items = fixableViolations.map((v: any) => ({
+      const items: ViolationQuickPickItem[] = fixableViolations.map((v: any) => ({
         label: `$(wrench) Fix: ${v.ruleId}`,
         description: `Impact: ${v.impact}`,
         detail: v.description,
         violation: v
       }));
 
-      const selected = await vscode.window.showQuickPick(items, {
+      const selected = await vscode.window.showQuickPick<ViolationQuickPickItem>(items, {
         placeHolder: `Select a violation to auto-fix (${fixableViolations.length} available)`,
         matchOnDescription: true,
         matchOnDetail: true
@@ -55,7 +69,7 @@ export function activate(context: vscode.ExtensionContext) {
       }
 
       const v = selected.violation;
-      await applyFix(v);
+      await applyFix(v, codeFileUri[0]);
 
     } catch (err) {
       vscode.window.showErrorMessage(`Failed to process report: ${err instanceof Error ? err.message : String(err)}`);
@@ -65,7 +79,7 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(disposable);
 }
 
-async function applyFix(violation: any) {
+async function applyFix(violation: any, fileUri: vscode.Uri) {
   const snippet = violation.htmlSnippet;
   const fix = violation.aiRemediation.remediatedCode;
 
@@ -74,46 +88,39 @@ async function applyFix(violation: any) {
     return;
   }
 
-  // Find files in workspace
-  const files = await vscode.workspace.findFiles('**/*.{js,jsx,ts,tsx,html}', '**/node_modules/**');
-  
-  let found = false;
-  
-  for (const file of files) {
-    try {
-      const document = await vscode.workspace.openTextDocument(file);
-      const text = document.getText();
+  try {
+    const document = await vscode.workspace.openTextDocument(fileUri);
+    const text = document.getText();
+    const trimSnippet = snippet.trim();
+    
+    // Create a flexible regex that ignores differences in whitespace/newlines
+    const parts = trimSnippet.split(/\s+/);
+    const escapedParts = parts.map(p => p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+    const pattern = escapedParts.join('\\s+');
+    const regex = new RegExp(pattern, 'm');
+    
+    // Try to find the substring using flexible matching
+    const match = text.match(regex);
+    
+    if (match && match.index !== undefined) {
+      const matchLength = match[0].length;
+      const startPos = document.positionAt(match.index);
+      const endPos = document.positionAt(match.index + matchLength);
+      const range = new vscode.Range(startPos, endPos);
       
-      const trimSnippet = snippet.trim();
+      const edit = new vscode.WorkspaceEdit();
+      edit.replace(fileUri, range, fix);
       
-      // Try to find the exact substring
-      const index = text.indexOf(trimSnippet);
-      
-      if (index !== -1) {
-        const startPos = document.positionAt(index);
-        const endPos = document.positionAt(index + trimSnippet.length);
-        const range = new vscode.Range(startPos, endPos);
-        
-        const edit = new vscode.WorkspaceEdit();
-        edit.replace(file, range, fix);
-        
-        const success = await vscode.workspace.applyEdit(edit);
-        if (success) {
-          vscode.window.showInformationMessage(`Successfully applied fix for ${violation.ruleId} in ${vscode.workspace.asRelativePath(file)}`);
-        } else {
-          vscode.window.showErrorMessage(`Failed to apply workspace edit for ${file.fsPath}`);
-        }
-        found = true;
-        break;
+      const success = await vscode.workspace.applyEdit(edit);
+      if (success) {
+        vscode.window.showInformationMessage(`Successfully applied fix for ${violation.ruleId} in ${vscode.workspace.asRelativePath(fileUri)}`);
+        return;
       }
-    } catch (e) {
-      // ignore read errors
     }
-  }
-
-  if (!found) {
+    
+    // If we reach here, the snippet wasn't found in the explicitly targeted file
     vscode.window.showWarningMessage(
-      `Could not automatically locate the exact code snippet in your workspace. You may need to apply the fix manually.`
+      `Could not automatically locate the exact code snippet in the selected file. The file may have changed or the snippet might be broken across multiple lines.`
     );
     
     // Copy fix to clipboard
@@ -123,6 +130,9 @@ async function applyFix(violation: any) {
         vscode.window.showInformationMessage(violation.aiRemediation.explanation, { modal: true });
       }
     });
+
+  } catch (e) {
+    vscode.window.showErrorMessage(`Error reading the target file: ${e instanceof Error ? e.message : String(e)}`);
   }
 }
 
