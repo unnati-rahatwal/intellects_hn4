@@ -29,6 +29,7 @@ import {
   X
 } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, Legend } from 'recharts';
+// @ts-ignore
 import ReactDiffViewer from 'react-diff-viewer-continued';
 
 interface ScanReport {
@@ -301,6 +302,7 @@ export default function DetailedReportPage({ params }: { params: Promise<{ id: s
   const [videoStatus, setVideoStatus] = useState<'PENDING' | 'GENERATING' | 'COMPLETED' | 'FAILED' | null>(null);
   const [previewImage, setPreviewImage] = useState<{ url: string; title: string } | null>(null);
   const [isSummaryExpanded, setIsSummaryExpanded] = useState(false);
+  const [selectedViolationId, setSelectedViolationId] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchReport() {
@@ -403,14 +405,14 @@ export default function DetailedReportPage({ params }: { params: Promise<{ id: s
   const handlePrintPdf = async () => {
     setIsExporting(true);
     try {
-      // @ts-expect-error html2pdf is dynamically imported without types
       const html2pdf = (await import('html2pdf.js')).default;
       const element = document.getElementById('report-content');
+      if (!element) return;
       
       const opt = {
         margin:       10,
         filename:     `AccessIQ-Report-${id}.pdf`,
-        image:        { type: 'jpeg', quality: 0.98 },
+        image:        { type: 'jpeg' as const, quality: 0.98 },
         html2canvas:  { 
           scale: 2, 
           useCORS: true, 
@@ -1032,31 +1034,120 @@ export default function DetailedReportPage({ params }: { params: Promise<{ id: s
       </div>
 
       {/* detailed Violations section */}
-      <div>
+      <div className="overflow-hidden">
         <div className="flex items-center justify-between mb-6 border-b border-slate-800 pb-4">
           <div>
             <h2 className="text-2xl font-bold text-white flex items-center gap-2">
-              <FileText className="w-6 h-6 text-cyan-500" /> Detailed Violation Intelligence
+              <FileText className="w-6 h-6 text-cyan-500" /> Organizational Violation Tree
             </h2>
             <p className="text-sm text-slate-400 mt-1">
-              Top critical and serious issues are automatically analyzed and remediated by AI.
+              Issues algorithmically structured by severity hierarchy.
             </p>
           </div>
-          <div className="text-sm text-slate-500 font-medium bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-700">
+          <div className="text-sm border border-slate-700 bg-slate-800 px-3 py-1.5 rounded-lg text-slate-400 font-medium">
             {violations.length} total entries
           </div>
         </div>
 
-        <div className="space-y-4">
-          {violations.slice(0, 50).map((v: any) => (
-            <ViolationCard key={v._id} violation={v} onPreview={handlePreviewImage} />
-          ))}
-          {violations.length > 50 && (
-            <div className="text-center py-8 text-slate-500">
-              Showing first 50 violations. Export report to view all {violations.length} issues.
+        <style dangerouslySetInnerHTML={{__html: `
+          .org-wrapper { overflow-x: auto; padding: 24px 20px 40px; display: block; border: 1px solid rgba(255,255,255,0.05); border-radius: 16px; background: rgba(15,23,42,0.4); }
+          .org-wrapper::-webkit-scrollbar { height: 8px; }
+          .org-wrapper::-webkit-scrollbar-track { background: transparent; }
+          .org-wrapper::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+          .org-wrapper::-webkit-scrollbar-thumb:hover { background: #475569; }
+          .org-tree * { box-sizing: border-box; }
+          
+          /* Left to Right Tree CSS */
+          .org-tree { display: inline-flex; flex-direction: row; align-items: center; justify-content: flex-start; position: relative; margin: 0; min-width: max-content; }
+          .org-node { background: #0f172a; border: 2px solid rgba(255,255,255,0.1); padding: 12px 24px; border-radius: 12px; text-align: left; position: relative; z-index: 2; display: inline-block; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
+          .org-node-leaf { position: relative; z-index: 2; display: inline-block; cursor: pointer; transition: all 0.2s; }
+          .org-node-leaf:hover { transform: translateX(4px); }
+          
+          .org-children { display: flex; flex-direction: column; justify-content: center; padding-left: 40px; position: relative; gap: 16px; }
+          .org-children::before { content: ''; position: absolute; left: 0; top: 50%; width: 40px; border-top: 2px solid #334155; margin-top: -1px; }
+          
+          .org-child { position: relative; display: flex; flex-direction: row; align-items: center; }
+          .org-child::before { content: ''; position: absolute; left: -40px; top: 50%; width: 40px; border-top: 2px solid #334155; margin-top: -1px; }
+          .org-child::after { content: ''; position: absolute; left: -40px; top: 0; height: 100%; border-left: 2px solid #334155; margin-left: -1px; }
+          
+          .org-child:first-child::after { top: 50%; height: 50%; }
+          .org-child:last-child::after { height: 50%; }
+          .org-child:only-child::after { display: none; }
+        `}} />
+
+        <div className="org-wrapper">
+          <div className="org-tree">
+            <div className="org-node" style={{ borderColor: '#22d3ee', boxShadow: '0 0 25px rgba(34,211,238,0.15)', textAlign: 'center' }}>
+               <div className="text-3xl mb-1">📄</div>
+               <div className="text-white font-black tracking-wide text-sm whitespace-nowrap">ROOT VIEW</div>
+               <div className="text-cyan-400 text-[10px] font-bold tracking-widest uppercase mt-1">{violations.length} Issues</div>
             </div>
-          )}
+            
+            <div className="org-children">
+              {(() => {
+                const groups = [
+                  { id: 'critical', title: 'CRITICAL', data: violations.filter(v => v.impact === 'critical'), color: { border: '#ef4444', bg: 'rgba(239,68,68,0.15)', text: '#ef4444' } },
+                  { id: 'serious', title: 'SERIOUS', data: violations.filter(v => v.impact === 'serious'), color: { border: '#f97316', bg: 'rgba(249,115,22,0.15)', text: '#f97316' } },
+                  { id: 'moderate', title: 'MODERATE', data: violations.filter(v => v.impact === 'moderate'), color: { border: '#eab308', bg: 'rgba(234,179,8,0.15)', text: '#eab308' } },
+                  { id: 'minor', title: 'MINOR', data: violations.filter(v => v.impact === 'minor'), color: { border: '#3b82f6', bg: 'rgba(59,130,246,0.15)', text: '#3b82f6' } }
+                ].filter(g => g.data.length > 0);
+
+                return (
+                  <>
+                    {groups.map(g => (
+                      <div className="org-child" key={g.id}>
+                        <div className="org-node text-center whitespace-nowrap" style={{ borderColor: g.color.border, backgroundColor: g.color.bg }}>
+                          <div style={{ color: g.color.text }} className="font-extrabold text-sm tracking-widest">{g.title}</div>
+                          <div className="text-[10px] font-bold opacity-90 mt-1" style={{ color: g.color.text }}>{g.data.length} DETECTED</div>
+                        </div>
+                        <div className="org-children">
+                          {g.data.slice(0, 15).map((v: any, i: number) => (
+                            <div className="org-child" key={v._id}>
+                              <div 
+                                className="org-node-leaf text-left w-[260px] whitespace-normal rounded-xl bg-slate-900 border border-slate-700/50 p-3"
+                                onClick={() => setSelectedViolationId(selectedViolationId === v._id ? null : v._id)}
+                                style={{
+                                   borderColor: selectedViolationId === v._id ? g.color.text : 'rgba(255,255,255,0.1)',
+                                   boxShadow: selectedViolationId === v._id ? `0 0 15px ${g.color.bg}` : 'none'
+                                 }}
+                              >
+                                 <div className="flex items-start gap-3 mb-2">
+                                    <div className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0" style={{ backgroundColor: g.color.bg, color: g.color.text }}>
+                                      {i + 1}
+                                    </div>
+                                    <div className="text-xs font-bold text-white leading-tight break-words">{v.ruleId || v.type || 'Issue'}</div>
+                                 </div>
+                                 <div className="text-[11px] text-slate-400 line-clamp-2 leading-relaxed">{v.description || v.suggestion}</div>
+                              </div>
+                            </div>
+                          ))}
+                          {g.data.length > 15 && (
+                            <div className="org-child">
+                              <div className="org-node-leaf text-left w-[260px] whitespace-normal rounded-xl bg-slate-800/50 border border-slate-700/50 p-3 italic text-slate-500 text-xs text-center border-dashed">
+                                + {g.data.length - 15} more {g.title.toLowerCase()} issues
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </>
+                );
+              })()}
+            </div>
+          </div>
         </div>
+
+        {/* Selected Issue Full Detail View */}
+        {selectedViolationId && (
+           <div className="mt-8 border border-slate-700/50 bg-slate-900/50 rounded-2xl p-6 animate-fade-in shadow-2xl relative">
+              <div className="flex items-center justify-between mb-4 pb-4 border-b border-slate-800">
+                 <h3 className="text-xl font-bold text-white flex items-center gap-2"><FileText className="w-5 h-5 text-cyan-400"/> Issue Deep Dive</h3>
+                 <button onClick={() => setSelectedViolationId(null)} className="flex items-center gap-2 text-xs font-bold text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded-lg transition-colors border border-slate-700"><X className="w-4 h-4"/> Close Display</button>
+              </div>
+              <ViolationCard violation={violations.find((v: any) => v._id === selectedViolationId)} onPreview={handlePreviewImage} />
+           </div>
+        )}
       </div>
 
       {previewImage && typeof window !== 'undefined' && createPortal(
@@ -1069,7 +1160,7 @@ export default function DetailedReportPage({ params }: { params: Promise<{ id: s
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800 bg-slate-900/80">
-              <p className="text-sm text-slate-200 truncate pr-4">{previewImage.title}</p>
+              <p className="text-sm text-slate-200 truncate pr-4">{previewImage?.title}</p>
               <button
                 type="button"
                 onClick={() => setPreviewImage(null)}
@@ -1079,10 +1170,9 @@ export default function DetailedReportPage({ params }: { params: Promise<{ id: s
               </button>
             </div>
             <div className="w-full h-[calc(92vh-52px)] flex items-center justify-center bg-black/80 overflow-hidden">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={previewImage.url}
-                alt={previewImage.title}
+                src={previewImage?.url}
+                alt={previewImage?.title}
                 className="max-w-full max-h-full object-contain"
               />
             </div>

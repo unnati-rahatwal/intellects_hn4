@@ -50,6 +50,22 @@
     .metric-pass { color: #34d399; }
     .metric-fail { color: #ef4444; }
     .metric-warn { color: #f59e0b; }
+
+    /* ORG TREE CSS */
+    .org-wrapper { overflow-x: auto; padding: 24px 20px; display: flex; justify-content: flex-start; min-width: 100%; border: 1px solid rgba(255,255,255,0.05); border-radius: 8px; background: rgba(0,0,0,0.2); }
+    .org-tree * { box-sizing: border-box; }
+    .org-tree { display: inline-flex; flex-direction: column; align-items: center; position: relative; margin: 0 auto; }
+    .org-node { background: #111827; border: 1px solid rgba(255,255,255,0.2); padding: 12px; border-radius: 8px; text-align: center; position: relative; z-index: 2; display: inline-block; box-shadow: 0 4px 6px rgba(0,0,0,0.5); }
+    .org-children { display: flex; justify-content: center; padding-top: 20px; position: relative; gap: 24px; }
+    .org-children::before { content: ''; position: absolute; top: 0; left: 50%; border-left: 2px solid #475569; width: 0; height: 20px; margin-left: -1px; }
+    .org-child { position: relative; padding-top: 20px; display: flex; flex-direction: column; align-items: center; }
+    .org-child::before { content: ''; position: absolute; top: 0; left: 50%; border-left: 2px solid #475569; width: 0; height: 20px; margin-left: -1px; }
+    .org-child::after { content: ''; position: absolute; top: 0; width: 100%; border-top: 2px solid #475569; left: 0; }
+    .org-child:first-child::after { left: 50%; width: 50%; }
+    .org-child:last-child::after { right: 50%; width: 50%; left: auto; }
+    .org-child:only-child::after { display: none; }
+    .issue-node { cursor: pointer; transition: all 0.2s; min-width: 160px; max-width: 240px; white-space: normal; text-align: left; }
+    .issue-node:hover { background: #1e293b; border-color: #0891b2 !important; box-shadow: 0 0 15px rgba(8,145,178,0.4); transform: translateY(-2px); }
   </style>
 </head>
 <body>

@@ -164,37 +164,86 @@ ${domString}`;
 
                 if (issues.length > 0) {
                     chrome.tabs.sendMessage(tab.id, { action: "HIGHLIGHT", issues });
-                    issues.forEach((issue, index) => {
-                        const card = document.createElement('div');
-                        card.title = "Click to scroll to this element";
-                        card.className = `issue-card ${issue.severity === 'critical' ? 'issue-critical' : 'issue-warning'}`;
-                        card.style.display = 'flex';
-                        card.style.alignItems = 'flex-start';
-                        card.style.gap = '12px';
-                        
-                        const numColor = issue.severity === 'critical' ? '#ef4444' : '#f59e0b';
-                        const numCircle = `<div style="width:24px;height:24px;border-radius:12px;background:${numColor};color:white;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:bold;flex-shrink:0;">${index + 1}</div>`;
-                        
-                        card.innerHTML = `
-                            ${numCircle}
-                            <div>
-                                <p class="issue-title">${issue.type}</p>
-                                <p class="issue-desc">${issue.suggestion}</p>
-                                <div class="issue-selector">${issue.selector}</div>
+                    
+                    const cIssues = issues.map((iss, i) => ({...iss, globalIdx: i})).filter(i => i.severity === 'critical');
+                    const wIssues = issues.map((iss, i) => ({...iss, globalIdx: i})).filter(i => i.severity !== 'critical');
+
+                    let treeHTML = `
+                        <div class="org-wrapper">
+                          <div class="org-tree">
+                             <div class="org-node" style="border-color: #22d3ee; box-shadow: 0 0 15px rgba(34,211,238,0.2);">
+                                <div style="font-size:20px; margin-bottom:4px;">📄</div>
+                                <div style="color:white; font-weight:bold; font-size:13px; margin-bottom:2px;">page.tsx</div>
+                                <div style="color:#22d3ee; font-size:10px;">Active UI Root</div>
+                             </div>
+                             <div class="org-children">
+                    `;
+
+                    if (cIssues.length > 0) {
+                        treeHTML += `
+                            <div class="org-child">
+                               <div class="org-node" style="border-color: #ef4444; background: rgba(239,68,68,0.1);">
+                                  <div style="color:#ef4444; font-weight:bold; font-size:13px;">Critical Issues</div>
+                                  <div style="color:#f87171; font-size:10px;">${cIssues.length} Detected</div>
+                               </div>
+                               <div class="org-children">
+                                  ${cIssues.map(issue => `
+                                    <div class="org-child">
+                                       <div class="org-node issue-node" data-selector="${issue.selector.replace(/"/g, '&quot;')}" style="border-color: #ef4444;">
+                                          <div style="display:flex; align-items:flex-start; gap:8px; margin-bottom:6px;">
+                                             <div style="background:#ef4444; color:white; border-radius:50%; width:20px; height:20px; display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:bold; flex-shrink:0;">${issue.globalIdx + 1}</div>
+                                             <div style="color:white; font-size:12px; font-weight:bold; line-height:1.2;">${issue.type}</div>
+                                          </div>
+                                          <div style="color:#94a3b8; font-size:10px; line-height:1.4;">${issue.suggestion}</div>
+                                       </div>
+                                    </div>
+                                  `).join('')}
+                               </div>
                             </div>
                         `;
-                        card.onclick = () => {
-                            chrome.tabs.sendMessage(tab.id, { action: "SCROLL_TO", selector: issue.selector });
+                    }
+
+                    if (wIssues.length > 0) {
+                        treeHTML += `
+                            <div class="org-child">
+                               <div class="org-node" style="border-color: #f59e0b; background: rgba(245,158,11,0.1);">
+                                  <div style="color:#f59e0b; font-weight:bold; font-size:13px;">Moderate Issues</div>
+                                  <div style="color:#fbbf24; font-size:10px;">${wIssues.length} Detected</div>
+                               </div>
+                               <div class="org-children">
+                                  ${wIssues.map(issue => `
+                                    <div class="org-child">
+                                       <div class="org-node issue-node" data-selector="${issue.selector.replace(/"/g, '&quot;')}" style="border-color: #f59e0b;">
+                                          <div style="display:flex; align-items:flex-start; gap:8px; margin-bottom:6px;">
+                                             <div style="background:#f59e0b; color:white; border-radius:50%; width:20px; height:20px; display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:bold; flex-shrink:0;">${issue.globalIdx + 1}</div>
+                                             <div style="color:white; font-size:12px; font-weight:bold; line-height:1.2;">${issue.type}</div>
+                                          </div>
+                                          <div style="color:#94a3b8; font-size:10px; line-height:1.4;">${issue.suggestion}</div>
+                                       </div>
+                                    </div>
+                                  `).join('')}
+                               </div>
+                            </div>
+                        `;
+                    }
+
+                    treeHTML += `
+                             </div>
+                          </div>
+                        </div>
+                    `;
+
+                    const treeContainer = document.createElement('div');
+                    treeContainer.innerHTML = treeHTML;
+                    
+                    // Attach click handlers to send SCROLL_TO msg
+                    treeContainer.querySelectorAll('.issue-node').forEach(node => {
+                        node.onclick = () => {
+                            chrome.tabs.sendMessage(tab.id, { action: "SCROLL_TO", selector: node.getAttribute('data-selector') });
                         };
-                        issuesList.appendChild(card);
                     });
                     
-                    const header = document.createElement('h3');
-                    header.style.color = "white";
-                    header.style.marginBottom = "12px";
-                    header.innerText = `Found ${issues.length} Issues`;
-                    issuesList.prepend(header);
-
+                    issuesList.appendChild(treeContainer);
                     issuesList.style.display = 'block';
                 } else {
                     emptyState.innerHTML = `<div style="font-size: 32px; margin-bottom: 16px;">✅</div>No critical WCAG violations detected by AI on this view.`;
