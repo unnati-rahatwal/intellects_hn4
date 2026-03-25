@@ -307,7 +307,7 @@ export default function DetailedReportPage({ params }: { params: Promise<{ id: s
   useEffect(() => {
     async function fetchReport() {
       try {
-        const token = localStorage.getItem('token');
+        const token = localStorage.getItem('accessiq_token');
         if (!token) return router.push('/login');
 
         const res = await fetch(`/api/scans/${id}/report`, {
@@ -350,7 +350,7 @@ export default function DetailedReportPage({ params }: { params: Promise<{ id: s
 
   const handleGenerateVideo = async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('accessiq_token');
       if (!token) {
         router.push('/login');
         return;

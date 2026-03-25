@@ -7,12 +7,15 @@ import { Violation } from './lib/models/violation';
 import { runScan } from './lib/scanner/index';
 import { generateScanSummary, generateBatchRemediations, generatePageInsights } from './lib/featherless';
 import { Page } from './lib/models/page';
+import { Project } from './lib/models/project';
+import User from './models/User';
 
 const POLL_INTERVAL = 3000; // 3 seconds
 const CONCURRENCY_LIMIT = 2; // Max 2 concurrent scans
 
 let activeScans = 0;
 let isAiProcessing = false;
+let isGithubReporting = false;
 
 async function processAiSynthesis() {
   if (isAiProcessing) return;
@@ -162,12 +165,109 @@ async function processAiSynthesis() {
   }
 }
 
+async function processGitHubReporting() {
+  if (isGithubReporting) return;
+  isGithubReporting = true;
+
+  try {
+    // Find completed scans with AI summary that haven't been reported to GitHub yet
+    const scanToReport = await Scan.findOne({
+      status: 'COMPLETED',
+      githubReportedAt: null,
+      'aiSummary.generatedAt': { $ne: null }
+    }).populate('projectId');
+
+    if (scanToReport) {
+      const project = await Project.findById(scanToReport.projectId);
+      if (!project || !project.githubRepo) {
+        // Not a GitHub project, mark as "reported" (done)
+        await Scan.findByIdAndUpdate(scanToReport._id, { githubReportedAt: new Date() });
+        return;
+      }
+
+      const user = await User.findById(project.userId).select('+githubToken');
+      if (!user || !user.githubToken) {
+        console.warn(`⚠️ [GitHub Report] User ${project.userId} has no GitHub token for project ${project._id}`);
+        // We'll leave it as null to retry if they connect later, OR mark as failed. 
+        // For now, let's mark as "done" with a fake old date or just skip to avoid spamming logs.
+        return;
+      }
+
+      console.log(`🚀 [GitHub Report] Pushing accessibility report to ${project.githubRepo} for scan ${scanToReport._id}...`);
+
+      const reportContent = `
+# AccessIQ Accessibility Report
+**Project:** ${project.name}
+**URL:** ${project.baseUrl}
+**Scan ID:** ${scanToReport._id}
+**Date:** ${new Date(scanToReport.createdAt).toLocaleString()}
+
+## 📊 Summary
+- **Accessibility Score:** ${scanToReport.accessibilityScore}/100
+- **Total Violations:** ${scanToReport.totalViolations}
+  - 🔴 Critical: ${scanToReport.criticalIssues}
+  - 🟠 Serious: ${scanToReport.seriousIssues}
+  - 🟡 Moderate: ${scanToReport.moderateIssues}
+  - 🔵 Minor: ${scanToReport.minorIssues}
+
+## 🧠 AI Executive Summary
+${scanToReport.aiSummary?.executiveSummary}
+
+---
+*Generated automatically by [AccessIQ](http://localhost:3000)*
+`;
+
+      const [owner, repo] = project.githubRepo.split('/');
+      const path = 'accessiq-report.md';
+
+      // 1. Get existing file SHA if it exists (for update)
+      let sha: string | undefined;
+      try {
+        const getFile = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`, {
+          headers: { Authorization: `Bearer ${user.githubToken}` }
+        });
+        if (getFile.ok) {
+          const fileData = await getFile.json();
+          sha = fileData.sha;
+        }
+      } catch (_error) {}
+
+      // 2. Commit the report
+      const commitRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`, {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${user.githubToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message: `[AccessIQ] Automated Accessibility Report - Score: ${scanToReport.accessibilityScore}`,
+          content: Buffer.from(reportContent).toString('base64'),
+          sha: sha, // Include SHA to overwrite existing file
+        })
+      });
+
+      if (commitRes.ok) {
+        await Scan.findByIdAndUpdate(scanToReport._id, { githubReportedAt: new Date() });
+        console.log(`✅ [GitHub Report] Report successfully pushed to ${project.githubRepo}`);
+      } else {
+        const errData = await commitRes.json();
+        console.error(`❌ [GitHub Report] Failed to push to GitHub:`, errData.message);
+      }
+    }
+  } catch (err: Error | any) {
+    console.error('Error in GitHub reporting loop:', err);
+  } finally {
+    isGithubReporting = false;
+  }
+}
+
 async function pollJobs() {
   if (activeScans >= CONCURRENCY_LIMIT) return;
 
   try {
     // Also process AI synthesis every poll cycle
     processAiSynthesis();
+    processGitHubReporting();
 
     const job = await Scan.findOneAndUpdate(
       { status: 'PENDING' },

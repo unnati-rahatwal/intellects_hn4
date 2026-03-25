@@ -44,7 +44,7 @@ export default function CompareScansPage({ params }: { params: Promise<{ id: str
 
     async function fetchScans() {
       try {
-        const token = localStorage.getItem('token');
+        const token = localStorage.getItem('accessiq_token');
         const headers = { 'Authorization': `Bearer ${token}` };
 
         const [resA, resB] = await Promise.all([

@@ -42,6 +42,7 @@ export interface IScan extends Document {
   videoUrl?: string;
   videoGeneratedAt?: Date;
   videoGenerationStatus?: 'PENDING' | 'GENERATING' | 'COMPLETED' | 'FAILED';
+  githubReportedAt?: Date;
 }
 
 const scanSchema = new Schema<IScan>(
@@ -101,6 +102,7 @@ const scanSchema = new Schema<IScan>(
       enum: ['PENDING', 'GENERATING', 'COMPLETED', 'FAILED'],
       default: 'PENDING',
     },
+    githubReportedAt: { type: Date },
   },
   { timestamps: true }
 );
