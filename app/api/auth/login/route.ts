@@ -37,7 +37,7 @@ export async function POST(req: Request) {
 
     const token = jwt.sign(
       { userId: user._id },
-      process.env.JWT_SECRET || "default_jwt_secret_key_change_in_production",
+      process.env.JWT_SECRET || "jwt_secret_key_change",
       { expiresIn: "7d" }
     );
 
@@ -47,7 +47,7 @@ export async function POST(req: Request) {
     );
 
     response.cookies.set({
-      name: "token",
+      name: "accessiq_token",
       value: token,
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",

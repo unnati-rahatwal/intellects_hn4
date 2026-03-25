@@ -10,7 +10,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Settings,
-  HelpCircle
+  HelpCircle,
+  GitBranch
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
@@ -21,6 +22,7 @@ const navItems = [
 ];
 
 const secondaryItems = [
+  { href: '/api/github/auth', label: 'GitHub Connect', icon: GitBranch },
   { href: '/settings', label: 'Settings', icon: Settings },
   { href: '/support', label: 'Support', icon: HelpCircle },
 ];
@@ -28,6 +30,20 @@ const secondaryItems = [
 export default function Sidebar() {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
+  const [githubConnected, setGithubConnected] = useState(false);
+
+  useEffect(() => {
+    async function checkStatus() {
+      try {
+        const res = await fetch('/api/user/me');
+        if (res.ok) {
+          const data = await res.json();
+          setGithubConnected(data.githubConnected);
+        }
+      } catch (e) {}
+    }
+    checkStatus();
+  }, []);
 
   useEffect(() => {
     const width = collapsed ? '72px' : '260px'; // Matching globals.css
@@ -43,7 +59,7 @@ export default function Sidebar() {
     >
       {/* Branding Area */}
       <div
-        className="flex items-center gap-3 px-6 flex-shrink-0 border-b border-white/5"
+        className="flex items-center gap-3 px-6 shrink-0 border-b border-white/5"
         style={{ height: 'var(--header-height)' }}
       >
         <Link href="/" className="flex items-center gap-3 group">
@@ -92,6 +108,8 @@ export default function Sidebar() {
         {secondaryItems.map((item) => {
           const isActive = pathname === item.href;
           const Icon = item.icon;
+          const isGithub = item.label === 'GitHub Connect';
+          const label = isGithub && githubConnected ? 'GitHub Connected' : item.label;
 
           return (
             <Link
@@ -100,11 +118,11 @@ export default function Sidebar() {
               className={`flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-200 group ${
                 isActive 
                   ? 'bg-white/5 text-white' 
-                  : 'text-slate-500 hover:text-slate-300 hover:bg-white/5'
+                  : isGithub && githubConnected ? 'text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/5' : 'text-slate-500 hover:text-slate-300 hover:bg-white/5'
               }`}
             >
-              <Icon size={20} />
-              {!collapsed && <span className="font-medium text-sm">{item.label}</span>}
+              <Icon size={20} className={isGithub && githubConnected ? "text-emerald-500" : ""} />
+              {!collapsed && <span className="font-medium text-sm">{label}</span>}
             </Link>
           );
         })}

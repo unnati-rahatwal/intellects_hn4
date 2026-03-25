@@ -16,7 +16,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     // Check if already logged in
-    const token = localStorage.getItem("token");
+    const token = localStorage.getItem("accessiq_token");
     if (token) {
       router.push("/dashboard");
     }
@@ -38,7 +38,7 @@ export default function LoginPage() {
 
       if (res.ok) {
         // Store token in localStorage as requested
-        localStorage.setItem("token", data.token);
+        localStorage.setItem("accessiq_token", data.token);
         // Force a refresh of the page or just push to dashboard
         router.push("/dashboard");
         router.refresh();

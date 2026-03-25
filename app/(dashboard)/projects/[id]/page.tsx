@@ -12,6 +12,7 @@ interface Project {
   baseUrl: string;
   description: string;
   totalScans: number;
+  githubRepo?: string;
 }
 
 interface Scan {
@@ -47,7 +48,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
 
   useEffect(() => {
     // Auth Guard
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('accessiq_token');
     if (!token) {
       router.push('/login');
       return;
@@ -176,6 +177,66 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
             <GitCompare size={16} /> Compare Selected ({selectedScans.length}/2)
           </Link>
         )}
+      </div>
+
+      {/* GitHub Integration Card */}
+      <div className="glass-card bg-slate-900 border border-slate-800 rounded-2xl p-6 mb-8 mt-4">
+        <div className="flex justify-between items-start">
+          <div>
+            <h3 className="text-sm font-semibold text-slate-300 mb-2 flex items-center gap-2">
+              <Globe size={16} /> GitHub CI/CD Pipeline
+            </h3>
+            <p className="text-sm text-slate-400 mb-4 max-w-2xl">Connect your GitHub account and specify your repository to automatically run accessibility scans on every push. AccessIQ will automatically push a Markdown report directly to your branch.</p>
+          </div>
+          <a href="/api/github/auth" className="btn btn-ghost text-slate-300 border border-slate-700 hover:bg-slate-800">
+             1. Connect GitHub App
+          </a>
+        </div>
+        
+        <div className="mt-4 p-4 bg-slate-950 rounded-xl border border-slate-800">
+            <label className="block text-xs font-semibold text-slate-400 mb-2">2. Link Target Repository</label>
+            <div className="flex gap-2">
+               <input 
+                 type="text" 
+                 className="input input-bordered w-full max-w-sm bg-slate-900 text-white border-slate-700 text-sm focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500" 
+                 placeholder="e.g. Abhishek3102/portfolio"
+                 defaultValue={project.githubRepo || ""}
+                 id="githubRepoInput"
+               />
+               <button 
+                 onClick={async () => {
+                    const repoInput = document.getElementById('githubRepoInput') as HTMLInputElement;
+                    if (!repoInput.value) return;
+                    try {
+                      await fetch(`/api/projects/${project._id}`, {
+                         method: 'PUT',
+                         headers: { 'Content-Type': 'application/json' },
+                         body: JSON.stringify({ githubRepo: repoInput.value })
+                      });
+                      alert('Repository linked successfully! Now add the Webhook URL below to your GitHub Repository Settings -> Webhooks.');
+                      setProject({ ...project, githubRepo: repoInput.value });
+                    } catch (_e) {
+                      alert('Failed to save repository');
+                    }
+                 }}
+                 className="btn btn-primary bg-cyan-600 hover:bg-cyan-500 border-0"
+               >
+                 Save Repo
+               </button>
+            </div>
+
+            {project.githubRepo && (
+               <div className="mt-6 pt-4 border-t border-slate-800/50">
+                 <p className="text-xs font-semibold text-slate-400 mb-2">3. Add this Payload URL to GitHub Webhooks</p>
+                 <code className="text-xs text-cyan-400 p-3 rounded-lg bg-slate-900 border border-cyan-900/30 block w-full overflow-x-auto shadow-inner select-all">
+                   {typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000'}/api/webhooks/github?projectId={project._id}
+                 </code>
+                 <p className="text-xs text-slate-500 mt-2 flex items-center gap-1">
+                    <AlertTriangle size={12} /> Set Content Type to <strong className="text-slate-400">application/json</strong> and trigger on <strong className="text-slate-400">Just the push event</strong>.
+                 </p>
+               </div>
+            )}
+        </div>
       </div>
 
       {scans.length > 0 && (

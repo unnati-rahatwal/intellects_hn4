@@ -3,13 +3,14 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Plus, Globe, ArrowRight, Search } from 'lucide-react';
+import { Plus, Globe, ArrowRight, Search, GitCompare } from 'lucide-react';
 
 interface Project {
   _id: string;
   name: string;
   baseUrl: string;
   description: string;
+  githubRepo?: string;
   createdAt: string;
 }
 
@@ -21,7 +22,7 @@ export default function ProjectsPage() {
 
   useEffect(() => {
     // Auth Guard
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('accessiq_token');
     if (!token) {
       router.push('/login');
       return;
@@ -99,8 +100,15 @@ export default function ProjectsPage() {
                 {project.description && (
                   <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 12 }}>{project.description}</p>
                 )}
-                <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                  Created {new Date(project.createdAt).toLocaleDateString()}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                    Created {new Date(project.createdAt).toLocaleDateString()}
+                  </div>
+                  {project.githubRepo && (
+                     <div className="badge badge-success" style={{ fontSize: 9, padding: '2px 8px' }}>
+                       <GitCompare size={10} /> GitHub
+                     </div>
+                  )}
                 </div>
               </div>
             </Link>

@@ -41,7 +41,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     // Auth Guard
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('accessiq_token');
     if (!token) {
       router.push('/login');
       return;

@@ -64,3 +64,27 @@ export async function DELETE(
     return NextResponse.json({ error: 'Failed to delete project' }, { status: 500 });
   }
 }
+
+export async function PUT(
+  req: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    await connectDB();
+    const { id } = await params;
+    
+    const body = await req.json();
+    const { githubRepo } = body;
+
+    const project = await Project.findByIdAndUpdate(id, { githubRepo }, { new: true });
+    
+    if (!project) {
+      return NextResponse.json({ error: 'Project not found' }, { status: 404 });
+    }
+
+    return NextResponse.json(project);
+  } catch (error) {
+    console.error('PUT /api/projects/[id] error:', error);
+    return NextResponse.json({ error: 'Failed to update project' }, { status: 500 });
+  }
+}
