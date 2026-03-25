@@ -80,7 +80,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
     if (!project) return;
     setScanning(true);
     try {
-      await fetch('/api/scans', {
+      const res = await fetch('/api/scans', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -89,9 +89,13 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
           options: { discoverRoutes: true, securityAudit: true, maxDepth: 3, includeShadowDom: true, includeIframes: true, visionEmulation: false },
         }),
       });
-      const res = await fetch(`/api/projects/${id}/scans`);
-      const data = await res.json();
-      if (Array.isArray(data)) setScans(data);
+      
+      if (res.ok) {
+        const scan = await res.json();
+        if (scan.scanId) {
+          router.push(`/scans/${scan.scanId}`);
+        }
+      }
     } catch (err) {
       console.error(err);
     } finally {
@@ -198,13 +202,13 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                   <td style={{ color: 'var(--text-muted)', fontSize: 13 }}>
                     {new Date(scan.createdAt).toLocaleString()}
                   </td>
-                  <td>
-                    {scan.status === 'COMPLETED' && (
+                   <td>
+                    {(scan.status === 'COMPLETED' || scan.status === 'PENDING' || scan.status === 'PROCESSING') && (
                       <Link href={`/scans/${scan._id}`} className="btn btn-ghost btn-sm">
                         View <ArrowRight size={12} />
                       </Link>
                     )}
-                    {(scan.status === 'PENDING' || scan.status === 'PROCESSING') && (
+                    {scan.status === 'PROCESSING' && (
                       <div className="spinner" />
                     )}
                   </td>

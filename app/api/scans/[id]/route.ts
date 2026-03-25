@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import mongoose from 'mongoose';
 import connectDB from '@/lib/db';
 import { Scan } from '@/lib/models/scan';
 
@@ -9,6 +10,10 @@ export async function GET(
   try {
     await connectDB();
     const { id } = await params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return NextResponse.json({ error: 'Invalid Scan ID' }, { status: 400 });
+    }
 
     const scan = await Scan.findById(id).lean();
     if (!scan) {

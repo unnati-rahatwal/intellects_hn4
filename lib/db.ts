@@ -1,6 +1,8 @@
 import mongoose from 'mongoose';
+import dotenv from 'dotenv';
 
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/a11y-audit';
+// Load environment variables immediately
+dotenv.config();
 
 interface MongooseCache {
   conn: typeof mongoose | null;
@@ -8,7 +10,6 @@ interface MongooseCache {
 }
 
 declare global {
-  // eslint-disable-next-line no-var
   var mongooseCache: MongooseCache | undefined;
 }
 
@@ -21,14 +22,24 @@ if (!global.mongooseCache) {
 export async function connectDB(): Promise<typeof mongoose> {
   if (cached.conn) return cached.conn;
 
+  // Dynamically resolve URI at connection time (after dotenv has loaded)
+  const mongoUri = process.env.MONGODB_URI;
+  
+  if (!mongoUri) {
+    throw new Error('❌ MONGODB_URI is not defined in the environment variables.');
+  }
+
   if (!cached.promise) {
-    cached.promise = mongoose.connect(MONGODB_URI, {
+    cached.promise = mongoose.connect(mongoUri, {
       bufferCommands: false,
     });
   }
 
   try {
     cached.conn = await cached.promise;
+    // Log the connection host (masked) for safety and diagnostic clarity
+    const host = cached.conn.connection.host;
+    console.log(`📡 Database: ${host.includes('localhost') ? 'LOCAL' : 'CLOUD'} (${host})`);
   } catch (e) {
     cached.promise = null;
     throw e;

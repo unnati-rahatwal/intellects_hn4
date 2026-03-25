@@ -1,3 +1,5 @@
+import dotenv from 'dotenv';
+dotenv.config();
 import mongoose from 'mongoose';
 import { connectDB } from './lib/db';
 import { Scan } from './lib/models/scan';
@@ -17,15 +19,18 @@ async function pollJobs() {
     // Atomically pick up a PENDING job
     const job = await Scan.findOneAndUpdate(
       { status: 'PENDING' },
-      { 
-        $set: { 
+      {
+        $set: {
           status: 'PROCESSING',
           startedAt: new Date()
-        } 
+        }
       },
-      { sort: { createdAt: 1 }, new: true }
+      {
+        sort: { createdAt: 1 },
+        returnDocument: 'after' // Fix deprecation warning completely
+      }
     );
-
+    console.log({ job })
     if (job) {
       activeScans++;
       console.log(`\n🔍 Found PENDING scan: ${job._id}`);
@@ -50,10 +55,12 @@ async function pollJobs() {
 
 async function main() {
   console.log('🔄 Connecting to MongoDB...');
+  const maskedUri = (process.env.MONGODB_URI || '').replace(/:([^@]+)@/, ':****@');
+  console.log(`📡 URI: ${maskedUri || 'NOT FOUND - using local default'}`);
   await connectDB();
   console.log('✅ MongoDB connected');
 
-  console.log(`🚀 Worker started. Polling for accessibility audit jobs every ${POLL_INTERVAL/1000}s...`);
+  console.log(`🚀 Worker started. Polling for accessibility audit jobs every ${POLL_INTERVAL / 1000}s...`);
   console.log(`📡 Concurrency limit: ${CONCURRENCY_LIMIT} active scans\n`);
 
   // Polling loop

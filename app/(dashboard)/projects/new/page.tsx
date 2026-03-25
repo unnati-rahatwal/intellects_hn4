@@ -49,7 +49,7 @@ export default function NewProjectPage() {
       // Optionally start a scan immediately
       if (startScan) {
         try {
-          await fetch('/api/scans', {
+          const scanRes = await fetch('/api/scans', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -65,8 +65,16 @@ export default function NewProjectPage() {
               },
             }),
           });
-        } catch {
-          // Scan creation failed but project was created
+          
+          if (scanRes.ok) {
+            const scan = await scanRes.json();
+            if (scan.scanId) {
+              router.push(`/scans/${scan.scanId}`);
+              return;
+            }
+          }
+        } catch (err) {
+          console.error('Scan creation failed:', err);
         }
       }
 

@@ -17,6 +17,27 @@ export interface ScanOptions {
   securityAudit: boolean;
 }
 
+async function logProgress(
+  scanId: string,
+  message: string,
+  status: 'INFO' | 'SUCCESS' | 'WARNING' | 'ERROR' = 'INFO'
+) {
+  try {
+    await Scan.findByIdAndUpdate(scanId, {
+      $push: {
+        progressLog: {
+          message,
+          timestamp: new Date(),
+          status,
+        },
+      },
+    });
+    console.log(`[SCAN ${scanId}] ${message}`);
+  } catch (err) {
+    console.error(`Failed to log progress: ${err}`);
+  }
+}
+
 export async function runScan(
   scanId: string,
   urls: string[],
@@ -30,7 +51,10 @@ export async function runScan(
   await Scan.findByIdAndUpdate(scanId, {
     status: 'PROCESSING',
     startedAt: new Date(),
+    progressLog: [{ message: 'Initializing accessibility audit engine...', timestamp: new Date(), status: 'INFO' }],
   });
+
+  await logProgress(scanId, 'Connecting to browser engine...');
 
   let browser: Browser | null = null;
 
@@ -40,15 +64,19 @@ export async function runScan(
       args: ['--no-sandbox', '--disable-setuid-sandbox'],
     });
 
+    await logProgress(scanId, 'Browser engine ready.');
+
     // Route discovery
     let allUrls = [...urls];
     if (options.discoverRoutes && urls.length > 0) {
       try {
+        await logProgress(scanId, `Starting deep route discovery for ${urls[0]}...`);
         const context = await browser.newContext();
         const page = await context.newPage();
         const discovered = await discoverRoutes(page, urls[0], options.maxDepth);
         allUrls = [...new Set([...urls, ...discovered])];
         await context.close();
+        await logProgress(scanId, `Discovered ${allUrls.length} total pages.`, 'SUCCESS');
       } catch (err) {
         console.error('Route discovery failed, continuing with provided URLs:', err);
       }
@@ -67,7 +95,10 @@ export async function runScan(
     let totalScore = 0;
 
     // Scan each URL
+    await logProgress(scanId, `Starting accessibility audit for ${allUrls.length} pages...`);
+    
     for (const url of allUrls) {
+      await logProgress(scanId, `Analyzing page: ${new URL(url).pathname || '/'}...`);
       const context: BrowserContext = await browser.newContext({
         viewport: { width: 1920, height: 1080 },
       });
@@ -115,6 +146,7 @@ export async function runScan(
         }
 
         const results = await axeBuilder.analyze();
+        await logProgress(scanId, `Completed accessibility audit for ${new URL(url).pathname || '/'}`, 'SUCCESS');
 
         // Take full-page screenshot
         let screenshotPath: string | undefined;
@@ -228,6 +260,8 @@ export async function runScan(
       pagesScanned,
       completedAt: new Date(),
     });
+
+    await logProgress(scanId, `Accessibility audit completed. Found ${totalViolations} issues across ${pagesScanned} pages.`, 'SUCCESS');
   } catch (error) {
     console.error('Scan failed:', error);
     await Scan.findByIdAndUpdate(scanId, {

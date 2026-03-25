@@ -22,6 +22,11 @@ export interface IScan extends Document {
     visionEmulation: boolean;
     securityAudit: boolean;
   };
+  progressLog: {
+    message: string;
+    timestamp: Date;
+    status?: 'INFO' | 'SUCCESS' | 'WARNING' | 'ERROR';
+  }[];
   errorMessage?: string;
   startedAt?: Date;
   completedAt?: Date;
@@ -59,6 +64,13 @@ const scanSchema = new Schema<IScan>(
       visionEmulation: { type: Boolean, default: false },
       securityAudit: { type: Boolean, default: true },
     },
+    progressLog: [
+      {
+        message: { type: String, required: true },
+        timestamp: { type: Date, default: Date.now },
+        status: { type: String, enum: ['INFO', 'SUCCESS', 'WARNING', 'ERROR'], default: 'INFO' },
+      },
+    ],
     errorMessage: { type: String },
     startedAt: { type: Date },
     completedAt: { type: Date },

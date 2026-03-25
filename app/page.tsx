@@ -453,7 +453,7 @@ export default function Home() {
       </footer>
 
       {isDemoOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/75 backdrop-blur-sm px-4">
+        <div className="fixed inset-0 z-100 flex items-center justify-center bg-black/75 backdrop-blur-sm px-4">
           <div className="w-full max-w-4xl rounded-2xl border border-white/10 bg-[#0B1222] shadow-2xl shadow-cyan-900/30 overflow-hidden">
             <div className="flex items-center justify-between px-5 py-4 border-b border-white/10 bg-[#111a2f]">
               <h3 className="text-white font-bold text-lg">Demo Analysis Preview</h3>

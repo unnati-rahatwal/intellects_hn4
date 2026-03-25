@@ -80,7 +80,7 @@ export default function RegisterPage() {
           </p>
         </div>
 
-        <div className="bg-white/[0.03] backdrop-blur-xl border border-white/10 p-10 rounded-3xl shadow-2xl relative overflow-hidden group">
+        <div className="bg-white/3 backdrop-blur-xl border border-white/10 p-10 rounded-3xl shadow-2xl relative overflow-hidden group">
           <div className="absolute top-0 left-0 w-full h-1 bg-linear-to-r from-transparent via-cyan-500/50 to-transparent" />
           
           <form className="space-y-6" onSubmit={handleSubmit}>
