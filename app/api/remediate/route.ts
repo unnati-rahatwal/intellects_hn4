@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import connectDB from '@/lib/db';
 import { Violation } from '@/lib/models/violation';
-import { generateRemediation } from '@/lib/featherless';
+import { generateBatchRemediations } from '@/lib/featherless';
 
 export async function POST(request: Request) {
   try {
@@ -26,17 +26,22 @@ export async function POST(request: Request) {
     }
 
     try {
-      const result = await generateRemediation(
-        violation.ruleId,
-        violation.failureSummary,
-        violation.htmlSnippet,
-        violation.description
-      );
+      const results = await generateBatchRemediations([
+        {
+          id: violation._id.toString(),
+          ruleId: violation.ruleId,
+          failureSummary: violation.failureSummary || violation.description || '',
+          htmlSnippet: violation.htmlSnippet || '',
+          description: violation.description || '',
+        }
+      ]);
+
+      const result = results[0];
 
       violation.aiRemediation = {
-        analysis: result.analysis,
-        remediatedCode: result.remediatedCode,
-        explanation: result.explanation,
+        analysis: result?.analysis || 'No analysis provided',
+        remediatedCode: result?.remediatedCode || 'No code provided',
+        explanation: result?.explanation || 'No explanation provided',
         status: 'GENERATED',
       };
 

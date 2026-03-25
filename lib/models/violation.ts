@@ -17,6 +17,11 @@ export interface IAiRemediation {
   status: RemediationStatus;
 }
 
+export interface IVisionDeficiency {
+  type: string;
+  base64Image: string;
+}
+
 export interface IViolation extends Document {
   scanId: mongoose.Types.ObjectId;
   pageUrl: string;
@@ -28,6 +33,7 @@ export interface IViolation extends Document {
   cssSelector: string;
   boundingBox: IBoundingBox | null;
   screenshotPath?: string;
+  visionDeficiencies: IVisionDeficiency[];
   wcagCriteria: string[];
   tags: string[];
   aiRemediation: IAiRemediation;
@@ -62,6 +68,12 @@ const violationSchema = new Schema<IViolation>(
       default: null,
     },
     screenshotPath: { type: String },
+    visionDeficiencies: [
+      {
+        type: { type: String, required: true },
+        base64Image: { type: String, required: true },
+      },
+    ],
     wcagCriteria: [{ type: String }],
     tags: [{ type: String }],
     aiRemediation: {

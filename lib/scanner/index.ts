@@ -1,9 +1,9 @@
 import { chromium, Browser, BrowserContext, Page as PlaywrightPage } from 'playwright';
 import AxeBuilder from '@axe-core/playwright';
-import connectDB from '@/lib/db';
-import { Scan } from '@/lib/models/scan';
-import { Violation } from '@/lib/models/violation';
-import { Page } from '@/lib/models/page';
+import connectDB from '../db';
+import { Scan } from '../models/scan';
+import { Page } from '../models/page';
+import { Violation, IViolation } from '../models/violation';
 import { discoverRoutes } from './route-discovery';
 import { analyzeSecurityHeaders } from './security';
 import {
@@ -195,6 +195,7 @@ export async function runScan(
         // Process violations
         const violations = results.violations;
         let pageViolationCount = 0;
+        const colorContrastDocs: { doc: IViolation; selector: string }[] = [];
 
         for (const violation of violations) {
           for (const node of violation.nodes) {
@@ -212,7 +213,7 @@ export async function runScan(
 
             const impact = (violation.impact || 'moderate') as 'minor' | 'moderate' | 'serious' | 'critical';
 
-            await Violation.create({
+            const doc = await Violation.create({
               scanId,
               pageUrl: url,
               ruleId: violation.id,
@@ -226,6 +227,16 @@ export async function runScan(
               wcagCriteria: violation.tags?.filter((t: string) => t.startsWith('wcag')) || [],
               tags: violation.tags || [],
             });
+
+            if (violation.id.includes('color-contrast') || violation.id.includes('contrast')) {
+              let selector = '';
+              if (Array.isArray(node.target) && node.target.length > 0) {
+                 selector = Array.isArray(node.target[0]) ? node.target[0].join(' ') : String(node.target[0]);
+              } else {
+                 selector = String(node.target);
+              }
+              colorContrastDocs.push({ doc, selector });
+            }
 
             pageViolationCount++;
             totalViolations++;
@@ -249,9 +260,9 @@ export async function runScan(
         totalScore += pageScore;
 
         // Vision deficiency screenshots
-        if (options.visionEmulation && violations.length > 0) {
+        if (options.visionEmulation && colorContrastDocs.length > 0) {
           try {
-            await captureVisionDeficiencyScreenshots(page, violations.slice(0, 3) as unknown as import('./cdp-utils').AxeViolation[]);
+            await captureVisionDeficiencyScreenshots(page, colorContrastDocs);
           } catch {
             // Non-critical, continue
           }

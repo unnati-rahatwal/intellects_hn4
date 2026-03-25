@@ -1,4 +1,5 @@
 import { Page as PlaywrightPage } from 'playwright';
+import { IViolation } from '../models/violation';
 
 export interface AxeViolation {
   id: string;
@@ -12,7 +13,7 @@ export interface AxeViolation {
 
 export async function captureVisionDeficiencyScreenshots(
   page: PlaywrightPage,
-  violations: AxeViolation[]
+  colorDocs: { doc: IViolation; selector: string }[]
 ): Promise<void> {
   const cdpSession = await page.context().newCDPSession(page);
 
@@ -23,14 +24,16 @@ export async function captureVisionDeficiencyScreenshots(
     'tritanopia',
   ] as const;
 
-  // Check for color-contrast violations specifically
-  const colorViolations = violations.filter(
-    (v) => v.id.includes('color-contrast') || v.id.includes('contrast')
-  );
-
-  if (colorViolations.length === 0) {
+  if (colorDocs.length === 0) {
     await cdpSession.detach();
     return;
+  }
+
+  // Initialize arrays
+  for (const item of colorDocs) {
+    if (!item.doc.visionDeficiencies) {
+      item.doc.visionDeficiencies = [];
+    }
   }
 
   for (const deficiency of deficiencies) {
@@ -39,16 +42,21 @@ export async function captureVisionDeficiencyScreenshots(
         type: deficiency,
       });
 
+      // Wait a moment for layout/colors to update
+      await new Promise(r => setTimeout(r, 500));
+
       // Capture screenshot under this vision deficiency
-      for (const violation of colorViolations.slice(0, 3)) {
-        const selector = violation.nodes?.[0]?.target?.[0];
-        if (selector && typeof selector === 'string') {
+      for (const item of colorDocs.slice(0, 3)) { // Limit to 3 to save time/space
+        if (item.selector) {
           try {
-            await page.locator(selector).first().screenshot({
+            const buffer = await page.locator(item.selector).first().screenshot({
               type: 'png',
             });
-            // In a production system, we'd upload this to storage
-            // and save the URL to the violation document
+            const base64Image = `data:image/png;base64,${buffer.toString('base64')}`;
+            item.doc.visionDeficiencies.push({
+              type: deficiency,
+              base64Image,
+            });
           } catch {
             // Element might not be visible
           }
@@ -69,6 +77,15 @@ export async function captureVisionDeficiencyScreenshots(
   }
 
   await cdpSession.detach();
+
+  // Save the updated documents to the database
+  for (const item of colorDocs.slice(0, 3)) {
+    try {
+      await item.doc.save();
+    } catch (err) {
+      console.error('Failed to save vision deficiency screenshots:', err);
+    }
+  }
 }
 
 export async function getAccessibilityTree(

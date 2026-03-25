@@ -25,6 +25,13 @@ export interface IPage extends Document {
   performanceMetrics: Record<string, unknown> | null;
   browserIssues: unknown[];
   accessibilityTreeSnapshot: unknown | null;
+  aiInsights: {
+    browserIssuesExplanation: string;
+    securityExplanation: string;
+    performanceExplanation: string;
+    axTreeExplanation: string;
+    generatedAt: Date | null;
+  } | null;
   createdAt: Date;
 }
 
@@ -61,6 +68,13 @@ const pageSchema = new Schema<IPage>(
     accessibilityTreeSnapshot: {
       type: Schema.Types.Mixed,
       default: null,
+    },
+    aiInsights: {
+      browserIssuesExplanation: { type: String, default: '' },
+      securityExplanation: { type: String, default: '' },
+      performanceExplanation: { type: String, default: '' },
+      axTreeExplanation: { type: String, default: '' },
+      generatedAt: { type: Date, default: null },
     },
   },
   { timestamps: true }

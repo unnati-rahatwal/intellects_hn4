@@ -17,7 +17,12 @@ import {
   BrainCircuit,
   Calendar,
   Globe,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Eye,
+  Lock,
+  Unlock,
+  Network,
+  Layers
 } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, Legend } from 'recharts';
 import ReactDiffViewer from 'react-diff-viewer-continued';
@@ -44,6 +49,7 @@ interface ScanReport {
       recommendations: string[];
       generatedAt: string | null;
     };
+    pagesScanned?: number;
   };
   pages: any[];
   violations: any[];
@@ -214,6 +220,34 @@ function ViolationCard({ violation }: { violation: any }) {
               </pre>
             </div>
           )}
+
+          {violation.visionDeficiencies && violation.visionDeficiencies.length > 0 && (
+            <div className="mt-6 border-t border-slate-800 pt-6">
+              <h4 className="flex items-center gap-2 text-sm font-semibold text-slate-300 mb-4">
+                <ImageIcon className="w-4 h-4 text-pink-400" /> Vision Deficiency Simulations
+              </h4>
+              <p className="text-xs text-slate-400 mb-4">
+                This shows how users with different types of colorblindness perceive the target element.
+              </p>
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                {violation.visionDeficiencies.map((sim: any, idx: number) => (
+                  <div key={idx} className="bg-slate-800/50 rounded-lg p-2 border border-slate-700">
+                    <div className="text-xs text-center text-slate-300 font-medium uppercase tracking-wider mb-2">
+                      {sim.type}
+                    </div>
+                    <div className="relative aspect-video w-full rounded overflow-hidden bg-black/40 flex items-center justify-center">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img 
+                        src={sim.base64Image} 
+                        alt={`${sim.type} simulation`} 
+                        className="max-w-full max-h-full object-contain"
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -312,7 +346,7 @@ export default function DetailedReportPage({ params }: { params: Promise<{ id: s
       {/* Global Scores */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <ScoreGauge score={scan.accessibilityScore || 0} label="Accessibility Health" icon={Activity} />
-        <ScoreGauge score={Math.round(perfScore)} label="Performance Profile (CDP)" icon={Zap} />
+        <ScoreGauge score={Math.round(perfScore)} label="Performance Profile" icon={Zap} />
         <ScoreGauge score={secScore} label="Security Posture" icon={Shield} />
       </div>
 
@@ -425,9 +459,9 @@ export default function DetailedReportPage({ params }: { params: Promise<{ id: s
       {/* Performance Profile */}
       <div className="glass-card bg-slate-900 border border-slate-800 rounded-2xl p-6">
         <h2 className="text-lg font-bold text-white mb-1 flex items-center gap-2">
-          <Zap className="w-5 h-5 text-yellow-500" /> CDP Performance Profile
+          <Zap className="w-5 h-5 text-yellow-500" /> Performance Intelligence
         </h2>
-        <p className="text-sm text-slate-400 mb-6">Aggregate metrics gathered via Chrome DevTools Protocol</p>
+        <p className="text-sm text-slate-400 mb-6">Aggregate metrics from deep browser-level profiling</p>
         
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="bg-slate-800/50 p-4 rounded-xl border border-slate-700/50">
@@ -459,6 +493,183 @@ export default function DetailedReportPage({ params }: { params: Promise<{ id: s
             </div>
           </div>
         </div>
+
+        {/* AI Performance Explanation */}
+        {pages.some((p: any) => p.aiInsights?.performanceExplanation) && (
+          <div className="mt-6 bg-gradient-to-r from-yellow-500/10 to-transparent border border-yellow-500/20 rounded-xl p-4">
+            <h4 className="text-sm font-bold text-yellow-400 flex items-center gap-2 mb-2">
+              <BrainCircuit className="w-4 h-4" /> AI Performance Analysis
+            </h4>
+            <p className="text-sm text-slate-300 leading-relaxed">
+              {pages.find((p: any) => p.aiInsights?.performanceExplanation)?.aiInsights?.performanceExplanation}
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* Per-Page Breakdown */}
+      <div className="glass-card bg-slate-900 border border-slate-800 rounded-2xl p-6">
+        <h2 className="text-lg font-bold text-white mb-1 flex items-center gap-2">
+          <Layers className="w-5 h-5 text-indigo-500" /> Per-Page Breakdown
+        </h2>
+        <p className="text-sm text-slate-400 mb-6">Individual accessibility and performance scores for each analyzed URL</p>
+        
+        <div className="space-y-3">
+          {pages.map((p: any) => (
+            <div key={p._id} className="bg-slate-800/50 border border-slate-700/40 rounded-xl p-4 hover:border-slate-600/60 transition-colors">
+              <div className="flex items-center justify-between">
+                <div className="flex-1 min-w-0">
+                  <p className="text-white font-medium truncate">{p.url}</p>
+                  <div className="flex flex-wrap gap-4 mt-2">
+                    <span className="text-xs text-slate-400">Score: <span className={`font-bold ${p.accessibilityScore >= 80 ? 'text-green-400' : p.accessibilityScore >= 50 ? 'text-amber-400' : 'text-red-400'}`}>{p.accessibilityScore}%</span></span>
+                    <span className="text-xs text-slate-400">Violations: <span className="text-white font-semibold">{p.violationCount}</span></span>
+                    <span className="text-xs text-slate-400">Load: <span className="text-white font-semibold">{p.loadTimeMs}ms</span></span>
+                    {p.performanceMetrics?.FirstContentfulPaint > 0 && (
+                      <span className="text-xs text-slate-400">FCP: <span className="text-white font-semibold">{(p.performanceMetrics.FirstContentfulPaint * 1000).toFixed(0)}ms</span></span>
+                    )}
+                  </div>
+                </div>
+                <div className={`w-12 h-12 rounded-full flex items-center justify-center text-sm font-bold border-2 ${p.accessibilityScore >= 80 ? 'border-green-500 text-green-400' : p.accessibilityScore >= 50 ? 'border-amber-500 text-amber-400' : 'border-red-500 text-red-400'}`}>
+                  {p.accessibilityScore}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Browser Intelligence (AI-explained browser audit issues) */}
+      <div className="glass-card bg-slate-900 border border-slate-800 rounded-2xl p-6">
+        <div className="flex items-center gap-3 mb-6 border-b border-slate-800 pb-4">
+          <div className="w-10 h-10 rounded-xl bg-orange-500/20 flex items-center justify-center">
+            <Network className="w-6 h-6 text-orange-400" />
+          </div>
+          <div>
+            <h2 className="text-xl font-bold text-white">Browser Intelligence Analysis</h2>
+            <p className="text-xs text-orange-400 font-medium">Automated browser-level audit findings explained by AI</p>
+          </div>
+        </div>
+
+        {pages.some((p: any) => p.browserIssues?.length > 0 || p.aiInsights?.browserIssuesExplanation) ? (
+          <div className="space-y-4">
+            {pages.filter((p: any) => p.browserIssues?.length > 0 || p.aiInsights?.browserIssuesExplanation).map((p: any) => (
+              <div key={p._id} className="bg-slate-800/50 border border-slate-700/40 rounded-xl p-4">
+                <p className="text-white font-medium text-sm mb-3 truncate">{p.url}</p>
+                {p.aiInsights?.browserIssuesExplanation ? (
+                  <div className="bg-gradient-to-r from-orange-500/10 to-transparent rounded-lg p-3 border border-orange-500/20">
+                    <p className="text-sm text-slate-300 leading-relaxed flex gap-2">
+                      <BrainCircuit className="w-4 h-4 text-orange-400 mt-0.5 shrink-0" />
+                      {p.aiInsights.browserIssuesExplanation}
+                    </p>
+                  </div>
+                ) : (
+                  <p className="text-sm text-slate-500 italic">AI analysis pending...</p>
+                )}
+                {p.browserIssues?.length > 0 && (
+                  <p className="text-xs text-slate-500 mt-2">{p.browserIssues.length} raw issue(s) detected</p>
+                )}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-8 text-slate-500">
+            <Network className="w-10 h-10 mx-auto mb-3 opacity-30" />
+            <p>No browser-level issues detected — great!</p>
+          </div>
+        )}
+      </div>
+
+      {/* Security Headers Deep Dive */}
+      <div className="glass-card bg-slate-900 border border-slate-800 rounded-2xl p-6">
+        <div className="flex items-center gap-3 mb-6 border-b border-slate-800 pb-4">
+          <div className="w-10 h-10 rounded-xl bg-emerald-500/20 flex items-center justify-center">
+            <Shield className="w-6 h-6 text-emerald-400" />
+          </div>
+          <div>
+            <h2 className="text-xl font-bold text-white">Security Posture Analysis</h2>
+            <p className="text-xs text-emerald-400 font-medium">HTTP security headers checklist with AI-powered recommendations</p>
+          </div>
+        </div>
+
+        {pages.filter((p: any) => p.securityHeaders).length > 0 ? (
+          <div className="space-y-4">
+            {pages.filter((p: any) => p.securityHeaders).map((p: any) => (
+              <div key={p._id} className="bg-slate-800/50 border border-slate-700/40 rounded-xl p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-white font-medium text-sm truncate flex-1">{p.url}</p>
+                  <span className={`text-xs font-bold px-2 py-1 rounded-full ${p.securityHeaders.score >= 80 ? 'bg-green-500/20 text-green-400' : p.securityHeaders.score >= 50 ? 'bg-amber-500/20 text-amber-400' : 'bg-red-500/20 text-red-400'}`}>
+                    {p.securityHeaders.score}%
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mb-3">
+                  {[{ label: 'Content-Security-Policy', ok: p.securityHeaders.hasCSP },
+                    { label: 'HSTS', ok: p.securityHeaders.hasHSTS },
+                    { label: 'X-Frame-Options', ok: p.securityHeaders.hasXFrameOptions },
+                    { label: 'X-Content-Type-Options', ok: p.securityHeaders.hasXContentTypeOptions },
+                  ].map(h => (
+                    <div key={h.label} className={`flex items-center gap-2 text-xs px-2 py-1.5 rounded-lg ${h.ok ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'}`}>
+                      {h.ok ? <Lock className="w-3 h-3" /> : <Unlock className="w-3 h-3" />}
+                      {h.label}
+                    </div>
+                  ))}
+                </div>
+
+                {p.securityHeaders.missingHeaders?.length > 0 && (
+                  <p className="text-xs text-red-400 mb-2">Missing: {p.securityHeaders.missingHeaders.join(', ')}</p>
+                )}
+
+                {p.aiInsights?.securityExplanation && (
+                  <div className="bg-gradient-to-r from-emerald-500/10 to-transparent rounded-lg p-3 border border-emerald-500/20">
+                    <p className="text-sm text-slate-300 leading-relaxed flex gap-2">
+                      <BrainCircuit className="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" />
+                      {p.aiInsights.securityExplanation}
+                    </p>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-8 text-slate-500">
+            <Shield className="w-10 h-10 mx-auto mb-3 opacity-30" />
+            <p>Security headers data not available for this scan.</p>
+          </div>
+        )}
+      </div>
+
+      {/* Accessibility Tree Intelligence */}
+      <div className="glass-card bg-slate-900 border border-slate-800 rounded-2xl p-6">
+        <div className="flex items-center gap-3 mb-6 border-b border-slate-800 pb-4">
+          <div className="w-10 h-10 rounded-xl bg-violet-500/20 flex items-center justify-center">
+            <Eye className="w-6 h-6 text-violet-400" />
+          </div>
+          <div>
+            <h2 className="text-xl font-bold text-white">Screen Reader Compatibility Analysis</h2>
+            <p className="text-xs text-violet-400 font-medium">AI evaluation of how assistive technologies interpret this page</p>
+          </div>
+        </div>
+
+        {pages.some((p: any) => p.aiInsights?.axTreeExplanation) ? (
+          <div className="space-y-4">
+            {pages.filter((p: any) => p.aiInsights?.axTreeExplanation).map((p: any) => (
+              <div key={p._id} className="bg-slate-800/50 border border-slate-700/40 rounded-xl p-4">
+                <p className="text-white font-medium text-sm mb-3 truncate">{p.url}</p>
+                <div className="bg-gradient-to-r from-violet-500/10 to-transparent rounded-lg p-3 border border-violet-500/20">
+                  <p className="text-sm text-slate-300 leading-relaxed flex gap-2">
+                    <BrainCircuit className="w-4 h-4 text-violet-400 mt-0.5 shrink-0" />
+                    {p.aiInsights.axTreeExplanation}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="flex flex-col items-center justify-center py-8 text-slate-500">
+            <Eye className="w-10 h-10 mb-3 opacity-30" />
+            <p>Accessibility tree analysis is being generated by AI. Please refresh shortly.</p>
+          </div>
+        )}
       </div>
 
       {/* detailed Violations section */}

@@ -87,7 +87,7 @@ export async function generateBatchRemediations(
 
   const apiKey = process.env.FEATHERLESS_API_KEY;
   // Use an ultra-small model for high-frequency minor remediations (highest rate limits)
-  const model = process.env.FEATHERLESS_SMALL_MODEL || 'Qwen/Qwen2.5-1.5B-Instruct';
+  const model = process.env.FEATHERLESS_SMALL_MODEL || 'Qwen/Qwen2.5-0.5B-Instruct';
 
   if (!apiKey || apiKey === 'your-key-here') {
     throw new Error('FEATHERLESS_API_KEY not configured');
@@ -163,7 +163,7 @@ export async function generateScanSummary(
 ): Promise<ScanSummaryResult> {
   const apiKey = process.env.FEATHERLESS_API_KEY;
   // Use a balanced model for the final executive report (better intelligence than 1.5B but lower limits than 32B)
-  const model = process.env.FEATHERLESS_LARGE_MODEL || 'meta-llama/Llama-3.1-8B-Instruct';
+  const model = process.env.FEATHERLESS_LARGE_MODEL || 'Qwen/Qwen2.5-7B-Instruct';
 
   if (!apiKey || apiKey === 'your-key-here') {
     throw new Error('FEATHERLESS_API_KEY not configured');
@@ -213,4 +213,83 @@ export async function generateScanSummary(
   }
 
   throw new Error('Failed to parse AI scan summary response after 2 attempts');
+}
+
+export interface PageInsightsResult {
+  browserIssuesExplanation: string;
+  securityExplanation: string;
+  performanceExplanation: string;
+  axTreeExplanation: string;
+}
+
+export async function generatePageInsights(pageData: {
+  url: string;
+  browserIssues: unknown[];
+  securityHeaders: Record<string, unknown> | null;
+  performanceMetrics: Record<string, unknown> | null;
+  axTreeSnippet: string;
+}): Promise<PageInsightsResult> {
+  const apiKey = process.env.FEATHERLESS_API_KEY;
+  const model = process.env.FEATHERLESS_SMALL_MODEL || 'Qwen/Qwen2.5-0.5B-Instruct';
+
+  if (!apiKey || apiKey === 'your-key-here') {
+    throw new Error('FEATHERLESS_API_KEY not configured');
+  }
+
+  const prompt = `You are an expert web platform engineer. Analyze the following data collected from an automated scan of ${pageData.url} and provide plain-English explanations a non-technical stakeholder can understand. Do NOT mention "Chrome DevTools" or "CDP" in your response.
+
+1. BROWSER ISSUES (automated browser audit findings):
+${JSON.stringify(pageData.browserIssues?.slice(0, 10) || [], null, 2)}
+
+2. SECURITY HEADERS:
+${JSON.stringify(pageData.securityHeaders || {}, null, 2)}
+
+3. PERFORMANCE METRICS:
+${JSON.stringify(pageData.performanceMetrics || {}, null, 2)}
+
+4. ACCESSIBILITY TREE SNIPPET (how assistive technology parses this page):
+${pageData.axTreeSnippet}
+
+For each category, provide a 2-3 sentence explanation of what was found, what it means for users, and what should be improved. If a category has no data, say "No issues detected."
+
+CRITICAL: Output ONLY raw JSON matching this schema:
+{"browserIssuesExplanation": "string", "securityExplanation": "string", "performanceExplanation": "string", "axTreeExplanation": "string"}`;
+
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const response = await fetch(FEATHERLESS_API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model,
+        messages: [{
+          role: 'user' as const,
+          content: attempt === 0
+            ? prompt
+            : `${prompt}\n\nCRITICAL: Output ONLY raw JSON. No markdown.`,
+        }],
+        max_tokens: 2000,
+        temperature: 0.1,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Featherless API error ${response.status}: ${errorText}`);
+    }
+
+    await sleep(2000);
+
+    const data = await response.json();
+    const content = data.choices?.[0]?.message?.content || '';
+
+    const parsed = tryParseJSON(content);
+    if (parsed && parsed.browserIssuesExplanation && parsed.securityExplanation) {
+      return parsed as PageInsightsResult;
+    }
+  }
+
+  throw new Error('Failed to parse page insights response after 2 attempts');
 }

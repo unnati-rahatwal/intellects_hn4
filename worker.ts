@@ -5,7 +5,8 @@ import { connectDB } from './lib/db';
 import { Scan } from './lib/models/scan';
 import { Violation } from './lib/models/violation';
 import { runScan } from './lib/scanner/index';
-import { generateScanSummary, generateBatchRemediations } from './lib/featherless';
+import { generateScanSummary, generateBatchRemediations, generatePageInsights } from './lib/featherless';
+import { Page } from './lib/models/page';
 
 const POLL_INTERVAL = 3000; // 3 seconds
 const CONCURRENCY_LIMIT = 2; // Max 2 concurrent scans
@@ -104,6 +105,45 @@ async function processAiSynthesis() {
         }
       }
     }
+
+    // 3. Find pages missing AI insights
+    const pageToAnalyze = await Page.findOne({
+      status: 'COMPLETED',
+      'aiInsights.generatedAt': null
+    });
+
+    if (pageToAnalyze) {
+      console.log(`🔬 [AI Catch-up] Generating Page Insights for ${pageToAnalyze.url}...`);
+      try {
+        // Truncate the AX tree to avoid token limits
+        const axTreeStr = JSON.stringify(pageToAnalyze.accessibilityTreeSnapshot || {});
+        const axTreeSnippet = axTreeStr.slice(0, 2000) + (axTreeStr.length > 2000 ? '...[truncated]' : '');
+
+        const insights = await generatePageInsights({
+          url: pageToAnalyze.url,
+          browserIssues: pageToAnalyze.browserIssues || [],
+          securityHeaders: pageToAnalyze.securityHeaders as Record<string, unknown> | null,
+          performanceMetrics: pageToAnalyze.performanceMetrics,
+          axTreeSnippet,
+        });
+
+        await Page.findByIdAndUpdate(pageToAnalyze._id, {
+          aiInsights: {
+            ...insights,
+            generatedAt: new Date()
+          }
+        });
+        console.log(`✅ [AI Catch-up] Page insights generated for ${pageToAnalyze.url}`);
+        await new Promise(r => setTimeout(r, 3000));
+      } catch (err) {
+        console.warn(`⚠️ [AI Catch-up] Page insights failed for ${pageToAnalyze.url}:`, err instanceof Error ? err.message : String(err));
+        // Mark as failed to avoid infinite retry
+        if (String(err).includes('400') || String(err).includes('Failed to parse')) {
+          await Page.findByIdAndUpdate(pageToAnalyze._id, { 'aiInsights.generatedAt': new Date() });
+        }
+      }
+    }
+
   } catch (err) {
     console.error('Error in AI synthesis catch-up:', err);
   } finally {
