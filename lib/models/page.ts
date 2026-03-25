@@ -20,6 +20,11 @@ export interface IPage extends Document {
   violationCount: number;
   accessibilityScore: number;
   screenshotPath?: string;
+  stageScreenshots: {
+    stage: 'PAGE_LOADED' | 'CDP_CAPTURED' | 'AXE_ANALYZED' | 'VISION_EMULATION' | 'FINAL';
+    imageData: string;
+    capturedAt: Date;
+  }[];
   securityHeaders: ISecurityHeaders | null;
   loadTimeMs: number;
   performanceMetrics: Record<string, unknown> | null;
@@ -52,6 +57,17 @@ const pageSchema = new Schema<IPage>(
     violationCount: { type: Number, default: 0 },
     accessibilityScore: { type: Number, default: 100 },
     screenshotPath: { type: String },
+    stageScreenshots: [
+      {
+        stage: {
+          type: String,
+          enum: ['PAGE_LOADED', 'CDP_CAPTURED', 'AXE_ANALYZED', 'VISION_EMULATION', 'FINAL'],
+          required: true,
+        },
+        imageData: { type: String, required: true },
+        capturedAt: { type: Date, default: Date.now },
+      },
+    ],
     securityHeaders: {
       type: Schema.Types.Mixed,
       default: null,

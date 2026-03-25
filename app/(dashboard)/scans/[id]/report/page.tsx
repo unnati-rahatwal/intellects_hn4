@@ -64,6 +64,14 @@ const SEVERITY_COLORS = {
   minor: '#3b82f6',
 };
 
+const STAGE_LABELS: Record<string, string> = {
+  PAGE_LOADED: 'Page Loaded',
+  CDP_CAPTURED: 'Browser Metrics',
+  AXE_ANALYZED: 'Axe Analysis',
+  VISION_EMULATION: 'Vision Emulation',
+  FINAL: 'Final Snapshot',
+};
+
 function ScoreGauge({ score, label, icon: Icon }: { score: number; label: string; icon: React.ElementType }) {
   const getScoreColor = (s: number) => {
     if (s >= 90) return 'text-green-500';
@@ -170,6 +178,21 @@ function ViolationCard({ violation }: { violation: any }) {
             <code className="block text-xs text-blue-300 bg-blue-950/30 p-3 rounded-lg border border-blue-900/50 break-all">
               {violation.cssSelector}
             </code>
+
+            {violation.screenshotPath && (
+              <div className="mt-3 border border-slate-800 rounded-lg overflow-hidden">
+                <div className="px-3 py-2 text-xs text-slate-400 bg-slate-900/70 border-b border-slate-800">
+                  Issue Snapshot
+                </div>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={violation.screenshotPath}
+                  alt={`Issue snapshot for ${violation.ruleId}`}
+                  className="w-full max-h-56 object-contain bg-black/40"
+                  loading="lazy"
+                />
+              </div>
+            )}
           </div>
         </div>
 
@@ -577,6 +600,15 @@ export default function DetailedReportPage({ params }: { params: Promise<{ id: s
         <div className="space-y-3">
           {pages.map((p: any) => (
             <div key={p._id} className="bg-slate-800/50 border border-slate-700/40 rounded-xl p-4 hover:border-slate-600/60 transition-colors">
+              {(() => {
+                const stageShots = Array.isArray(p.stageScreenshots) && p.stageScreenshots.length > 0
+                  ? p.stageScreenshots
+                  : (p.screenshotPath
+                    ? [{ stage: 'FINAL', imageData: p.screenshotPath, capturedAt: p.createdAt }]
+                    : []);
+
+                return (
+                  <>
               <div className="flex items-center justify-between">
                 <div className="flex-1 min-w-0">
                   <p className="text-white font-medium truncate">{p.url}</p>
@@ -593,6 +625,33 @@ export default function DetailedReportPage({ params }: { params: Promise<{ id: s
                   {p.accessibilityScore}
                 </div>
               </div>
+
+              {stageShots.length > 0 && (
+                <div className="mt-4 border-t border-slate-700/50 pt-4">
+                  <div className="text-xs text-slate-400 mb-3">Scan Stage Snapshots</div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {stageShots.map((shot: any, idx: number) => (
+                      <div key={`${p._id}-stage-${idx}`} className="bg-slate-900/70 border border-slate-700 rounded-lg overflow-hidden">
+                        <div className="px-2 py-1.5 text-[11px] font-medium text-slate-300 border-b border-slate-700">
+                          {STAGE_LABELS[shot.stage] || shot.stage}
+                        </div>
+                        <div className="aspect-video bg-black/30">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={shot.imageData}
+                            alt={`${STAGE_LABELS[shot.stage] || shot.stage} for ${p.url}`}
+                            className="w-full h-full object-cover"
+                            loading="lazy"
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+                  </>
+                );
+              })()}
             </div>
           ))}
         </div>
@@ -677,6 +736,21 @@ export default function DetailedReportPage({ params }: { params: Promise<{ id: s
 
                 {p.securityHeaders.missingHeaders?.length > 0 && (
                   <p className="text-xs text-red-400 mb-2">Missing: {p.securityHeaders.missingHeaders.join(', ')}</p>
+                )}
+
+                {p.screenshotPath && (
+                  <div className="mb-3 border border-slate-700 rounded-lg overflow-hidden">
+                    <div className="px-2 py-1.5 text-[11px] text-slate-400 bg-slate-900/70 border-b border-slate-700">
+                      Page Section Snapshot
+                    </div>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={p.screenshotPath}
+                      alt={`Page snapshot for ${p.url}`}
+                      className="w-full max-h-64 object-contain bg-black/30"
+                      loading="lazy"
+                    />
+                  </div>
                 )}
 
                 {p.aiInsights?.securityExplanation && (
