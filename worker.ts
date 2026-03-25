@@ -5,14 +5,17 @@ import { connectDB } from './lib/db';
 import { Scan } from './lib/models/scan';
 import { Violation } from './lib/models/violation';
 import { runScan } from './lib/scanner/index';
-import { generateScanSummary, generateRemediation } from './lib/featherless';
+import { generateScanSummary, generateBatchRemediations } from './lib/featherless';
 
 const POLL_INTERVAL = 3000; // 3 seconds
 const CONCURRENCY_LIMIT = 2; // Max 2 concurrent scans
 
 let activeScans = 0;
+let isAiProcessing = false;
 
 async function processAiSynthesis() {
+  if (isAiProcessing) return;
+  isAiProcessing = true;
   try {
     // 1. Find COMPLETED scans missing AI summary
     const scanToSummarize = await Scan.findOne({
@@ -43,44 +46,68 @@ async function processAiSynthesis() {
           }
         });
         console.log(`✅ [AI Catch-up] Summary generated for ${scanToSummarize._id}`);
+        // Small delay after summary
+        await new Promise(r => setTimeout(r, 2000));
       } catch (err) {
         console.error(`❌ [AI Catch-up] Summary failed for ${scanToSummarize._id}:`, err instanceof Error ? err.message : String(err));
       }
     }
 
-    // 2. Find PENDING violations across any completed scans
-    const violationToRemediate = await Violation.findOne({
+    // 2. Find PENDING violations across any completed scans (Batch up to 10)
+    const violationsToRemediate = await Violation.find({
       'aiRemediation.status': 'PENDING'
-    });
+    }).limit(10);
 
-    if (violationToRemediate) {
-      console.log(`🛠️ [AI Catch-up] Remediating violation ${violationToRemediate._id} (${violationToRemediate.ruleId})...`);
+    if (violationsToRemediate.length > 0) {
+      console.log(`🛠️ [AI Catch-up] Remediating ${violationsToRemediate.length} violations in batch...`);
       try {
-        const result = await generateRemediation(
-          violationToRemediate.ruleId,
-          violationToRemediate.failureSummary,
-          violationToRemediate.htmlSnippet,
-          violationToRemediate.description
-        );
-        await Violation.findByIdAndUpdate(violationToRemediate._id, {
-          aiRemediation: {
-            analysis: result.analysis,
-            remediatedCode: result.remediatedCode,
-            explanation: result.explanation,
-            status: 'GENERATED',
-          }
-        });
-        console.log(`✅ [AI Catch-up] Remediated ${violationToRemediate._id}`);
+        const inputs = violationsToRemediate.map(v => ({
+          id: v._id.toString(),
+          ruleId: v.ruleId,
+          failureSummary: v.failureSummary || v.description || '',
+          htmlSnippet: v.htmlSnippet || '',
+          description: v.description || ''
+        }));
+        
+        const results = await generateBatchRemediations(inputs);
+        
+        for (const result of results) {
+          await Violation.findByIdAndUpdate(result.id, {
+            aiRemediation: {
+              analysis: result.analysis,
+              remediatedCode: result.remediatedCode,
+              explanation: result.explanation,
+              status: 'GENERATED',
+            }
+          });
+        }
+        
+        // Handle failed items (if model forgot to return them)
+        const successIds = results.map(r => r.id);
+        const failedIds = inputs.filter(i => !successIds.includes(i.id)).map(i => i.id);
+        
+        if (failedIds.length > 0) {
+           await Violation.updateMany({ _id: { $in: failedIds } }, { 'aiRemediation.status': 'FAILED' });
+           console.warn(`⚠️ [AI Catch-up] ${failedIds.length} violations failed to remediate in batch.`);
+        }
+        
+        console.log(`✅ [AI Catch-up] Remediated ${successIds.length} violations successfully.`);
+        // Sleep 5 seconds to let API concurrency tokens reset fully
+        await new Promise(r => setTimeout(r, 5000));
       } catch (err) {
-        console.warn(`⚠️ [AI Catch-up] Remediation failed for ${violationToRemediate._id}:`, err instanceof Error ? err.message : String(err));
-        // Set to FAILED if it contains "API error 4xx" to avoid infinite loops on bad requests
-        if (String(err).includes('400')) {
-          await Violation.findByIdAndUpdate(violationToRemediate._id, { 'aiRemediation.status': 'FAILED' });
+        console.warn(`⚠️ [AI Catch-up] Batch remediation failed:`, err instanceof Error ? err.message : String(err));
+        
+        const badRequest = String(err).includes('400') || String(err).includes('Failed to parse');
+        if (badRequest) {
+          const ids = violationsToRemediate.map(v => v._id);
+          await Violation.updateMany({ _id: { $in: ids } }, { 'aiRemediation.status': 'FAILED' });
         }
       }
     }
   } catch (err) {
     console.error('Error in AI synthesis catch-up:', err);
+  } finally {
+    isAiProcessing = false;
   }
 }
 
