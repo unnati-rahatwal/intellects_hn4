@@ -22,7 +22,9 @@ import {
   Lock,
   Unlock,
   Network,
-  Layers
+  Layers,
+  Download,
+  Printer
 } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, Legend } from 'recharts';
 import ReactDiffViewer from 'react-diff-viewer-continued';
@@ -120,8 +122,8 @@ function ViolationCard({ violation }: { violation: any }) {
           <span
             className="px-2.5 py-1 text-xs font-bold uppercase tracking-wider rounded-md"
             style={{
-              backgroundColor: `${SEVERITY_COLORS[violation.impact as keyof typeof SEVERITY_COLORS]}20`,
-              color: SEVERITY_COLORS[violation.impact as keyof typeof SEVERITY_COLORS]
+              backgroundColor: `${SEVERITY_COLORS[violation.impact as keyof typeof SEVERITY_COLORS] || '#475569'}20`,
+              color: SEVERITY_COLORS[violation.impact as keyof typeof SEVERITY_COLORS] || '#475569'
             }}
           >
             {violation.impact}
@@ -135,121 +137,121 @@ function ViolationCard({ violation }: { violation: any }) {
               <BrainCircuit className="w-3 h-3" /> AI Remediated
             </span>
           )}
-          {expanded ? <ChevronUp className="text-slate-500" /> : <ChevronDown className="text-slate-500" />}
+          <div className="print:hidden">
+            {expanded ? <ChevronUp className="text-slate-500" /> : <ChevronDown className="text-slate-500" />}
+          </div>
         </div>
       </div>
 
-      {expanded && (
-        <div className="p-6 border-t border-slate-800 space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div>
-              <h4 className="flex items-center gap-2 text-sm font-semibold text-slate-300 mb-2">
-                <AlertTriangle className="w-4 h-4 text-red-400" /> {hasAi ? 'Specific Failure Diagnosis (AI)' : 'Failure Summary'}
-              </h4>
-              <div className="text-sm text-slate-400 leading-relaxed bg-black/20 p-3 rounded-lg border border-slate-800">
-                {hasAi ? (
-                  <p>{ai?.analysis}</p>
-                ) : isPending ? (
-                  <div className="flex items-center gap-2 text-cyan-400 animate-pulse">
-                    <BrainCircuit className="w-4 h-4" />
-                    <span>AI Diagnosis pending...</span>
-                  </div>
-                ) : (
-                  <p>{violation.failureSummary || violation.help || violation.description || 'No summary available.'}</p>
-                )}
-              </div>
-            </div>
-            
-            <div>
-              <h4 className="flex items-center gap-2 text-sm font-semibold text-slate-300 mb-2">
-                <Code className="w-4 h-4 text-blue-400" /> Target Selector
-              </h4>
-              <code className="block text-xs text-blue-300 bg-blue-950/30 p-3 rounded-lg border border-blue-900/50 break-all">
-                {violation.cssSelector}
-              </code>
+      <div className={`p-6 border-t border-slate-800 space-y-6 ${expanded ? 'block' : 'hidden print:block'}`}>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div>
+            <h4 className="flex items-center gap-2 text-sm font-semibold text-slate-300 mb-2">
+              <AlertTriangle className="w-4 h-4 text-red-400" /> {hasAi ? 'Specific Failure Diagnosis (AI)' : 'Failure Summary'}
+            </h4>
+            <div className="text-sm text-slate-400 leading-relaxed bg-black/20 p-3 rounded-lg border border-slate-800">
+              {hasAi ? (
+                <p>{ai?.analysis}</p>
+              ) : isPending ? (
+                <div className="flex items-center gap-2 text-cyan-400 animate-pulse">
+                  <BrainCircuit className="w-4 h-4" />
+                  <span>AI Diagnosis pending...</span>
+                </div>
+              ) : (
+                <p>{violation.failureSummary || violation.help || violation.description || 'No summary available.'}</p>
+              )}
             </div>
           </div>
+          
+          <div>
+            <h4 className="flex items-center gap-2 text-sm font-semibold text-slate-300 mb-2">
+              <Code className="w-4 h-4 text-blue-400" /> Target Selector
+            </h4>
+            <code className="block text-xs text-blue-300 bg-blue-950/30 p-3 rounded-lg border border-blue-900/50 break-all">
+              {violation.cssSelector}
+            </code>
+          </div>
+        </div>
 
-          {hasAi ? (
-            <div className="mt-6 border border-purple-900/40 rounded-xl overflow-hidden">
-              <div className="bg-purple-900/20 px-4 py-3 border-b border-purple-900/40 flex items-center gap-2">
-                <BrainCircuit className="w-5 h-5 text-purple-400" />
-                <h3 className="font-semibold text-purple-200">AI Remediation Analysis</h3>
+        {hasAi ? (
+          <div className="mt-6 border border-purple-900/40 rounded-xl overflow-hidden">
+            <div className="bg-purple-900/20 px-4 py-3 border-b border-purple-900/40 flex items-center gap-2">
+              <BrainCircuit className="w-5 h-5 text-purple-400" />
+              <h3 className="font-semibold text-purple-200">AI Remediation Analysis</h3>
+            </div>
+            <div className="p-5 space-y-6 bg-slate-900/50">
+              <div>
+                <h4 className="text-xs font-semibold uppercase tracking-widest text-slate-500 mb-2">Fix Explanation</h4>
+                <p className="text-sm text-slate-300 leading-relaxed border-l-2 border-purple-500 pl-3">
+                  {ai.explanation}
+                </p>
               </div>
-              <div className="p-5 space-y-6 bg-slate-900/50">
-                <div>
-                  <h4 className="text-xs font-semibold uppercase tracking-widest text-slate-500 mb-2">Fix Explanation</h4>
-                  <p className="text-sm text-slate-300 leading-relaxed border-l-2 border-purple-500 pl-3">
-                    {ai.explanation}
-                  </p>
-                </div>
-                <div>
-                  <h4 className="text-xs font-semibold uppercase tracking-widest text-slate-500 mb-2">Code Diff</h4>
-                  <div className="rounded-lg overflow-hidden border border-slate-800">
-                    <ReactDiffViewer
-                      oldValue={violation.htmlSnippet}
-                      newValue={ai.remediatedCode}
-                      splitView={false}
-                      useDarkTheme={true}
-                      styles={{
-                        variables: {
-                          dark: {
-                            diffViewerBackground: '#0f172a',
-                            diffViewerColor: '#cbd5e1',
-                            addedBackground: '#064e3b',
-                            addedColor: '#a7f3d0',
-                            removedBackground: '#7f1d1d',
-                            removedColor: '#fecaca',
-                            wordAddedBackground: '#059669',
-                            wordRemovedBackground: '#dc2626',
-                          }
+              <div>
+                <h4 className="text-xs font-semibold uppercase tracking-widest text-slate-500 mb-2">Code Diff</h4>
+                <div className="rounded-lg overflow-hidden border border-slate-800">
+                  <ReactDiffViewer
+                    oldValue={violation.htmlSnippet}
+                    newValue={ai.remediatedCode}
+                    splitView={false}
+                    useDarkTheme={true}
+                    styles={{
+                      variables: {
+                        dark: {
+                          diffViewerBackground: '#0f172a',
+                          diffViewerColor: '#cbd5e1',
+                          addedBackground: '#064e3b',
+                          addedColor: '#a7f3d0',
+                          removedBackground: '#7f1d1d',
+                          removedColor: '#fecaca',
+                          wordAddedBackground: '#059669',
+                          wordRemovedBackground: '#dc2626',
                         }
-                      }}
+                      }
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="mt-4">
+            <h4 className="flex items-center gap-2 text-sm font-semibold text-slate-300 mb-2">
+              <Code className="w-4 h-4 text-slate-400" /> HTML Snippet
+            </h4>
+            <pre className="text-xs text-slate-300 bg-black/40 p-4 rounded-lg border border-slate-800 overflow-x-auto">
+              {violation.htmlSnippet}
+            </pre>
+          </div>
+        )}
+
+        {violation.visionDeficiencies && violation.visionDeficiencies.length > 0 && (
+          <div className="mt-6 border-t border-slate-800 pt-6">
+            <h4 className="flex items-center gap-2 text-sm font-semibold text-slate-300 mb-4">
+              <ImageIcon className="w-4 h-4 text-pink-400" /> Vision Deficiency Simulations
+            </h4>
+            <p className="text-xs text-slate-400 mb-4 print:hidden">
+              This shows how users with different types of colorblindness perceive the target element.
+            </p>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              {violation.visionDeficiencies.map((sim: any, idx: number) => (
+                <div key={idx} className="bg-slate-800/50 rounded-lg p-2 border border-slate-700">
+                  <div className="text-xs text-center text-slate-300 font-medium uppercase tracking-wider mb-2">
+                    {sim.type}
+                  </div>
+                  <div className="relative aspect-video w-full rounded overflow-hidden bg-black/40 flex items-center justify-center">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img 
+                      src={sim.base64Image} 
+                      alt={`${sim.type} simulation`} 
+                      className="max-w-full max-h-full object-contain"
                     />
                   </div>
                 </div>
-              </div>
+              ))}
             </div>
-          ) : (
-            <div className="mt-4">
-              <h4 className="flex items-center gap-2 text-sm font-semibold text-slate-300 mb-2">
-                <Code className="w-4 h-4 text-slate-400" /> HTML Snippet
-              </h4>
-              <pre className="text-xs text-slate-300 bg-black/40 p-4 rounded-lg border border-slate-800 overflow-x-auto">
-                {violation.htmlSnippet}
-              </pre>
-            </div>
-          )}
-
-          {violation.visionDeficiencies && violation.visionDeficiencies.length > 0 && (
-            <div className="mt-6 border-t border-slate-800 pt-6">
-              <h4 className="flex items-center gap-2 text-sm font-semibold text-slate-300 mb-4">
-                <ImageIcon className="w-4 h-4 text-pink-400" /> Vision Deficiency Simulations
-              </h4>
-              <p className="text-xs text-slate-400 mb-4">
-                This shows how users with different types of colorblindness perceive the target element.
-              </p>
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                {violation.visionDeficiencies.map((sim: any, idx: number) => (
-                  <div key={idx} className="bg-slate-800/50 rounded-lg p-2 border border-slate-700">
-                    <div className="text-xs text-center text-slate-300 font-medium uppercase tracking-wider mb-2">
-                      {sim.type}
-                    </div>
-                    <div className="relative aspect-video w-full rounded overflow-hidden bg-black/40 flex items-center justify-center">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img 
-                        src={sim.base64Image} 
-                        alt={`${sim.type} simulation`} 
-                        className="max-w-full max-h-full object-contain"
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -296,7 +298,16 @@ export default function DetailedReportPage({ params }: { params: Promise<{ id: s
   }
 
   const { scan, violations, pages } = data;
-  
+  const handleExportJson = () => {
+    if (scan) {
+      window.open(`/api/scans/${scan._id}/export`, '_blank');
+    }
+  };
+
+  const handlePrintPdf = () => {
+    window.print();
+  };
+
   // Severity Distribution Data for Pie Chart
   const severityData = [
     { name: 'Critical', value: scan.criticalIssues, color: SEVERITY_COLORS.critical },
@@ -336,8 +347,14 @@ export default function DetailedReportPage({ params }: { params: Promise<{ id: s
             </p>
           </div>
         </div>
-        <div className="flex gap-3">
-          <Link href={`/scans/${scan._id}/explore`} className="btn btn-primary bg-cyan-500 hover:bg-cyan-600 text-slate-900">
+        <div className="flex flex-wrap gap-3">
+          <button onClick={handlePrintPdf} className="btn bg-slate-800 hover:bg-slate-700 text-white border border-slate-700 print:hidden text-sm px-4 py-2 flex items-center rounded-lg transition-colors">
+            <Printer className="w-4 h-4 mr-2" /> Save PDF
+          </button>
+          <button onClick={handleExportJson} className="btn bg-slate-800 hover:bg-slate-700 text-white border border-slate-700 print:hidden text-sm px-4 py-2 flex items-center rounded-lg transition-colors">
+            <Download className="w-4 h-4 mr-2" /> Export JSON
+          </button>
+          <Link href={`/scans/${scan._id}/explore`} className="btn btn-primary bg-cyan-500 hover:bg-cyan-600 text-slate-900 print:hidden text-sm px-4 py-2 flex items-center rounded-lg font-medium transition-colors">
             <ImageIcon className="w-4 h-4 mr-2" /> Visual Explorer
           </Link>
         </div>
@@ -496,7 +513,7 @@ export default function DetailedReportPage({ params }: { params: Promise<{ id: s
 
         {/* AI Performance Explanation */}
         {pages.some((p: any) => p.aiInsights?.performanceExplanation) && (
-          <div className="mt-6 bg-gradient-to-r from-yellow-500/10 to-transparent border border-yellow-500/20 rounded-xl p-4">
+          <div className="mt-6 bg-linear-to-r from-yellow-500/10 to-transparent border border-yellow-500/20 rounded-xl p-4">
             <h4 className="text-sm font-bold text-yellow-400 flex items-center gap-2 mb-2">
               <BrainCircuit className="w-4 h-4" /> AI Performance Analysis
             </h4>
@@ -556,7 +573,7 @@ export default function DetailedReportPage({ params }: { params: Promise<{ id: s
               <div key={p._id} className="bg-slate-800/50 border border-slate-700/40 rounded-xl p-4">
                 <p className="text-white font-medium text-sm mb-3 truncate">{p.url}</p>
                 {p.aiInsights?.browserIssuesExplanation ? (
-                  <div className="bg-gradient-to-r from-orange-500/10 to-transparent rounded-lg p-3 border border-orange-500/20">
+                  <div className="bg-linear-to-r from-orange-500/10 to-transparent rounded-lg p-3 border border-orange-500/20">
                     <p className="text-sm text-slate-300 leading-relaxed flex gap-2">
                       <BrainCircuit className="w-4 h-4 text-orange-400 mt-0.5 shrink-0" />
                       {p.aiInsights.browserIssuesExplanation}
@@ -620,7 +637,7 @@ export default function DetailedReportPage({ params }: { params: Promise<{ id: s
                 )}
 
                 {p.aiInsights?.securityExplanation && (
-                  <div className="bg-gradient-to-r from-emerald-500/10 to-transparent rounded-lg p-3 border border-emerald-500/20">
+                  <div className="bg-linear-to-r from-emerald-500/10 to-transparent rounded-lg p-3 border border-emerald-500/20">
                     <p className="text-sm text-slate-300 leading-relaxed flex gap-2">
                       <BrainCircuit className="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" />
                       {p.aiInsights.securityExplanation}
@@ -655,7 +672,7 @@ export default function DetailedReportPage({ params }: { params: Promise<{ id: s
             {pages.filter((p: any) => p.aiInsights?.axTreeExplanation).map((p: any) => (
               <div key={p._id} className="bg-slate-800/50 border border-slate-700/40 rounded-xl p-4">
                 <p className="text-white font-medium text-sm mb-3 truncate">{p.url}</p>
-                <div className="bg-gradient-to-r from-violet-500/10 to-transparent rounded-lg p-3 border border-violet-500/20">
+                <div className="bg-linear-to-r from-violet-500/10 to-transparent rounded-lg p-3 border border-violet-500/20">
                   <p className="text-sm text-slate-300 leading-relaxed flex gap-2">
                     <BrainCircuit className="w-4 h-4 text-violet-400 mt-0.5 shrink-0" />
                     {p.aiInsights.axTreeExplanation}
