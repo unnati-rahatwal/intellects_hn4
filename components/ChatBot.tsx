@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
+import { usePathname } from "next/navigation";
 import { MessageCircle, X, Send, Bot, User } from "lucide-react";
 
 interface Message {
@@ -13,13 +14,25 @@ export default function ChatBot() {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
     {
-      id: "1",
+      id: "init",
       sender: "bot",
       text: "Hi there! I'm the AccessIQ AI assistant. How can I help you today?",
     },
   ]);
   const [inputValue, setInputValue] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const pathname = usePathname() || "";
+
+  const getPageContextName = () => {
+    if (pathname === "/") return "Home";
+    if (pathname.includes("/login")) return "Login";
+    if (pathname.includes("/register")) return "Register";
+    if (pathname.includes("/report")) return "Compliance Report";
+    if (pathname.includes("/scans")) return "Scan Details";
+    if (pathname.includes("/projects")) return "Projects";
+    if (pathname.includes("/dashboard")) return "Dashboard";
+    return "Page";
+  };
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -42,23 +55,53 @@ export default function ChatBot() {
     setMessages((prev) => [...prev, userMsg]);
     setInputValue("");
 
-    // Simple keyword-based auto-responder
+    // --- CONTEXT-AWARE RESPONSE LOGIC ---
     setTimeout(() => {
       const lower = userMsg.text.toLowerCase();
-      let botResponse =
-        "I'm a simple demo bot! I can answer questions about what AccessIQ is, how to scan, or our pricing.";
+      let botResponse = "I'm a simple demo bot! I can answer questions about what AccessIQ is, how to scan, or our pricing.";
 
+      // 1. Core Feature Knowledge Base (Describing the Views)
+      if (lower.includes("compliance")) {
+        botResponse = "The Compliance Report details your site's WCAG violations, severity levels, and provides specific AI-powered code remediations to fix them.";
+      } else if (lower.includes("dashboard")) {
+        botResponse = "The AccessIQ Dashboard is your central hub. From here you can manage all your active projects, view aggregate accessibility scores, and initiate new deep scans.";
+      } else if (lower.includes("executive") || lower.includes("audit")) {
+        botResponse = "The Executive Audit Report provides a high-level summary of your web portfolio's health, perfect for stakeholders and compliance officers.";
+      } else if (lower.includes("portfolio")) {
+        botResponse = "Your Portfolio tracking interface displays all your monitored websites and their historical accessibility performance trends over time.";
+      }
+      
+      // 2. Report / Scans Context Questions
+      else if (pathname.includes("/report") || pathname.includes("/scans")) {
+        if (lower.includes("violation") || lower.includes("what does this mean") || lower.includes("wcag")) {
+          botResponse = "In these reports, WCAG violations show issues that fail accessibility guidelines. 'A' is severe, and 'AAA' is the highest standard. Click 'Fix Issue' to see specific code remediations for each highlighted violation.";
+        } else if (lower.includes("score") || lower.includes("accessibility score")) {
+          botResponse = "Your accessibility score is calculated based on the severity and frequency of issues found compared to passing WCAG 2.1 AA/AAA standards.";
+        } else if (lower.includes("remedy") || lower.includes("remediation") || lower.includes("fix")) {
+          botResponse = "AccessIQ generates AI-powered auto-fixes for most issues! Look for the suggested code snippets within each violation card. You can safely copy and paste those fixes.";
+        } else if (lower.includes("export") || lower.includes("download")) {
+          botResponse = "You can usually export your compliance report to PDF or CSV using the Export button located near the top right of the report view.";
+        }
+      }
+      
+      // 2. Dashboard Context Questions
+      else if (pathname.includes("/dashboard")) {
+        if (lower.includes("project") || lower.includes("create")) {
+          botResponse = "To create a project, simply click the 'New Project' button, enter the root URL of your website, and we'll handle the deep-linking and discovery automatically.";
+        } else if (lower.includes("metric") || lower.includes("graph") || lower.includes("chart")) {
+          botResponse = "Your dashboard graphs represent average accessibility scores over time and unresolved violations across all your active web projects.";
+        } else if (lower.includes("scan")) {
+          botResponse = "You have the ability to run deep multi-page crawling scans right here from your project list. Just select a project and hit 'Run Scan'.";
+        }
+      }
+
+      // 3. Global / General Context (Overrides if they ask general things anywhere)
       if (lower.includes("what is") || lower.includes("about")) {
-        botResponse =
-          "AccessIQ is an enterprise-grade web accessibility audit platform. We analyze websites to find WCAG violations and offer AI-powered remediation suggestions.";
+        botResponse = "AccessIQ is an enterprise-grade web accessibility audit platform. We analyze websites to find WCAG violations and offer AI-powered remediation suggestions.";
       } else if (lower.includes("price") || lower.includes("cost") || lower.includes("free")) {
-        botResponse =
-          "AccessIQ is currently free during our beta phase! You can register and start auditing your web pages right away.";
-      } else if (lower.includes("scan") || lower.includes("audit") || lower.includes("how to")) {
-        botResponse =
-          "To start scanning, simply log in, go to your Dashboard, create a new Project, and click 'Run Scan' on your desired URLs!";
+        botResponse = "AccessIQ is currently free during our beta phase! Enjoy full access to deep web crawling and AI remediation.";
       } else if (lower.includes("hello") || lower.includes("hi")) {
-        botResponse = "Hello! Let me know if you have any questions about AccessIQ.";
+        botResponse = "Hello! Let me know what you'd like to explore on this page.";
       }
 
       setMessages((prev) => [
@@ -79,7 +122,7 @@ export default function ChatBot() {
         <button
           onClick={() => setIsOpen(true)}
           className="fixed bottom-6 right-6 z-50 p-4 bg-linear-to-br from-orange-500 to-fuchsia-600 rounded-full shadow-lg shadow-orange-900/40 hover:scale-110 hover:shadow-orange-700/50 transition-all duration-300 group"
-          aria-label="Open Chatbot"
+          aria-label="Open Contextual Chatbot"
         >
           <MessageCircle className="text-white w-6 h-6 group-hover:rotate-12 transition-transform" />
           <span className="absolute -top-1 -right-1 flex h-3 w-3">
@@ -103,7 +146,7 @@ export default function ChatBot() {
                 <h3 className="text-white font-semibold text-sm">AccessIQ Assistant</h3>
                 <p className="text-orange-400/80 text-xs flex items-center gap-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-orange-500 animate-pulse"></span>
-                  Online
+                  Viewing {getPageContextName()}
                 </p>
               </div>
             </div>
@@ -141,7 +184,7 @@ export default function ChatBot() {
                       : "bg-white/5 text-zinc-300 border border-white/5"
                   }`}
                 >
-                  {msg.text}
+                  <p>{msg.text}</p>
                 </div>
               </div>
             ))}
