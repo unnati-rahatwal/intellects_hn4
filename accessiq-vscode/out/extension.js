@@ -84,16 +84,10 @@ async function applyFixes(violations, fileUri) {
                 continue;
             }
             const trimSnippet = snippet.trim();
-            // Create a flexible regex that ignores differences in whitespace/newlines
-            const parts = trimSnippet.split(/\s+/);
-            const escapedParts = parts.map((p) => p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
-            const pattern = escapedParts.join('\\s+');
-            const regex = new RegExp(pattern, 'm');
-            const match = text.match(regex);
-            if (match && match.index !== undefined) {
-                const matchLength = match[0].length;
+            const match = findBestStringMatch(text, trimSnippet);
+            if (match) {
                 const startPos = document.positionAt(match.index);
-                const endPos = document.positionAt(match.index + matchLength);
+                const endPos = document.positionAt(match.index + match.length);
                 const range = new vscode.Range(startPos, endPos);
                 edit.replace(fileUri, range, fix);
                 appliedCount++;
@@ -121,4 +115,67 @@ async function applyFixes(violations, fileUri) {
     }
 }
 function deactivate() { }
+// 3-Tier Resilient HTML Snippet Locator for Compiled/Rehydrated Source Code
+function findBestStringMatch(text, snippet) {
+    // Tier 1: Flexible Whitespace & Wildcard Match
+    let escapedParts = snippet.split(/\s+/).map(p => p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+    let pattern = escapedParts.join('\\s+').replace(/\\\.\\\.\\\./g, '[\\s\\S]*?');
+    try {
+        const regex = new RegExp(pattern, 'm');
+        const exactMatch = text.match(regex);
+        if (exactMatch && exactMatch.index !== undefined) {
+            return { index: exactMatch.index, length: exactMatch[0].length };
+        }
+    }
+    catch (e) { }
+    // Tier 2: Head & Tail Match (Bypasses extreme inner truncations from Axe-core)
+    const cleanSnippet = snippet.replace(/\.\.\.$/, '').trim();
+    if (cleanSnippet.length > 25) {
+        try {
+            const head = cleanSnippet.substring(0, 15).replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+');
+            const tail = cleanSnippet.substring(cleanSnippet.length - 15).replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+');
+            const htPattern = new RegExp(head + '[\\s\\S]*?' + tail, 'm');
+            const htMatch = text.match(htPattern);
+            if (htMatch && htMatch.index !== undefined) {
+                return { index: htMatch.index, length: htMatch[0].length };
+            }
+        }
+        catch (e) { }
+    }
+    // Tier 3: Attribute Fingerprinting (Bypasses attribute reordering and quote swapping)
+    const tagMatch = snippet.match(/^<([a-z0-9\-]+)/i);
+    if (!tagMatch)
+        return null;
+    const tagName = tagMatch[1];
+    const keys = [];
+    const attrRegex = /="([^"]+)"/g; // extract exact attribute values as unique fingerprints
+    let m;
+    while ((m = attrRegex.exec(snippet)) !== null) {
+        if (m[1].length > 3)
+            keys.push(m[1]);
+    }
+    if (keys.length === 0)
+        return null; // No unique fingerprints to rely on safely
+    const tagSearchRegex = new RegExp(`<${tagName}\\b[^>]*>`, 'gi');
+    let bestScore = 0;
+    let bestMatch = null;
+    let sourceMatch;
+    while ((sourceMatch = tagSearchRegex.exec(text)) !== null) {
+        const tagSource = sourceMatch[0];
+        let score = 0;
+        for (const key of keys) {
+            if (tagSource.includes(key))
+                score++;
+        }
+        if (score > bestScore) {
+            bestScore = score;
+            bestMatch = { index: sourceMatch.index, length: tagSource.length };
+        }
+    }
+    // Only return if we met a reasonable confidence threshold
+    if (bestMatch && bestScore >= Math.min(2, keys.length)) {
+        return bestMatch;
+    }
+    return null;
+}
 //# sourceMappingURL=extension.js.map
