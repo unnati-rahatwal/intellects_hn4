@@ -262,6 +262,7 @@ export default function DetailedReportPage({ params }: { params: Promise<{ id: s
   
   const [data, setData] = useState<ScanReport | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isExporting, setIsExporting] = useState(false);
 
   useEffect(() => {
     async function fetchReport() {
@@ -304,8 +305,34 @@ export default function DetailedReportPage({ params }: { params: Promise<{ id: s
     }
   };
 
-  const handlePrintPdf = () => {
-    window.print();
+  const handlePrintPdf = async () => {
+    setIsExporting(true);
+    try {
+      // @ts-expect-error html2pdf is dynamically imported without types
+      const html2pdf = (await import('html2pdf.js')).default;
+      const element = document.getElementById('report-content');
+      
+      const opt = {
+        margin:       10,
+        filename:     `AccessIQ-Report-${id}.pdf`,
+        image:        { type: 'jpeg', quality: 0.98 },
+        html2canvas:  { 
+          scale: 2, 
+          useCORS: true, 
+          backgroundColor: '#0A0F1C', 
+          windowWidth: 1200 // Force wide layout so charts aren't crunched
+        },
+        jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      };
+
+      await html2pdf().set(opt).from(element).save();
+    } catch (err) {
+      console.error('Failed to generate PDF:', err);
+      // Fallback to normal print if html2pdf fails
+      window.print();
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   // Severity Distribution Data for Pie Chart
@@ -331,7 +358,18 @@ export default function DetailedReportPage({ params }: { params: Promise<{ id: s
   }
 
   return (
-    <div className="max-w-7xl mx-auto space-y-8 pb-20 animate-fade-in">
+    <div id="report-content" className="max-w-7xl mx-auto space-y-8 pb-20 animate-fade-in relative">
+      {/* Export loading overlay */}
+      {isExporting && (
+        <div className="fixed inset-0 z-50 bg-[#0A0F1C]/80 backdrop-blur-sm flex items-center justify-center print:hidden rounded-xl">
+          <div className="bg-slate-900 border border-slate-700 p-8 rounded-2xl shadow-2xl flex flex-col items-center gap-4">
+            <div className="w-12 h-12 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin" />
+            <h3 className="text-xl font-bold text-white tracking-tight">Generating PDF</h3>
+            <p className="text-slate-400 text-sm">Capturing high-fidelity layout. Please wait...</p>
+          </div>
+        </div>
+      )}
+      
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
@@ -347,9 +385,14 @@ export default function DetailedReportPage({ params }: { params: Promise<{ id: s
             </p>
           </div>
         </div>
-        <div className="flex flex-wrap gap-3">
-          <button onClick={handlePrintPdf} className="btn bg-slate-800 hover:bg-slate-700 text-white border border-slate-700 print:hidden text-sm px-4 py-2 flex items-center rounded-lg transition-colors">
-            <Printer className="w-4 h-4 mr-2" /> Save PDF
+        <div className="flex flex-wrap gap-3" data-html2canvas-ignore>
+          <button 
+            onClick={handlePrintPdf} 
+            disabled={isExporting}
+            className="btn bg-slate-800 hover:bg-slate-700 text-white border border-slate-700 print:hidden text-sm px-4 py-2 flex items-center rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Printer className={`w-4 h-4 mr-2 ${isExporting ? 'animate-pulse' : ''}`} /> 
+            {isExporting ? 'Saving...' : 'Save PDF'}
           </button>
           <button onClick={handleExportJson} className="btn bg-slate-800 hover:bg-slate-700 text-white border border-slate-700 print:hidden text-sm px-4 py-2 flex items-center rounded-lg transition-colors">
             <Download className="w-4 h-4 mr-2" /> Export JSON

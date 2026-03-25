@@ -36,7 +36,7 @@ export default function Sidebar() {
 
   return (
     <aside
-      className="fixed top-0 left-0 h-full z-50 flex flex-col transition-all duration-300 bg-[#0A0F1C] border-r border-white/5 shadow-2xl"
+      className="fixed top-0 left-0 h-full z-50 flex flex-col transition-all duration-300 bg-[#0A0F1C] border-r border-white/5 shadow-2xl print:hidden"
       style={{
         width: 'var(--current-sidebar-width, 260px)',
       }}
