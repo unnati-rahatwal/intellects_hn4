@@ -6,15 +6,16 @@ import {
   LayoutDashboard,
   FolderKanban,
   ScanSearch,
-  Settings,
   Shield,
+  Layout,
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react';
 import { useState } from 'react';
 
 const navItems = [
-  { href: '/', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/', label: 'Home', icon: Layout },
+  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/projects', label: 'Projects', icon: FolderKanban },
   { href: '/projects/new', label: 'New Scan', icon: ScanSearch },
 ];

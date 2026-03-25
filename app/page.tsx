@@ -1,251 +1,254 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import {
-  Shield,
-  AlertTriangle,
-  CheckCircle,
-  Clock,
-  ArrowRight,
-  Plus,
+import { 
+  Shield, 
+  Zap, 
+  Code2, 
+  Search, 
+  ArrowRight, 
   Globe,
-  TrendingUp,
+  Layout
 } from 'lucide-react';
 
-interface Project {
-  _id: string;
-  name: string;
-  baseUrl: string;
-  createdAt: string;
-}
-
-interface Scan {
-  _id: string;
-  projectId: string;
-  status: string;
-  accessibilityScore: number;
-  totalViolations: number;
-  criticalIssues: number;
-  seriousIssues: number;
-  pagesScanned: number;
-  completedAt: string;
-}
-
-export default function DashboardPage() {
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [recentScans, setRecentScans] = useState<Scan[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    async function fetchData() {
-      try {
-        const [projRes] = await Promise.all([
-          fetch('/api/projects'),
-        ]);
-        const projData = await projRes.json();
-        setProjects(Array.isArray(projData) ? projData : []);
-
-        // Fetch recent scans for each project
-        const allScans: Scan[] = [];
-        for (const proj of (Array.isArray(projData) ? projData : []).slice(0, 5)) {
-          try {
-            const scanRes = await fetch(`/api/projects/${proj._id}/scans`);
-            const scanData = await scanRes.json();
-            if (Array.isArray(scanData)) {
-              allScans.push(...scanData.slice(0, 3));
-            }
-          } catch { /* ignore */ }
-        }
-        setRecentScans(allScans.sort((a, b) =>
-          new Date(b.completedAt || b._id).getTime() - new Date(a.completedAt || a._id).getTime()
-        ).slice(0, 8));
-      } catch (err) {
-        console.error('Failed to fetch dashboard data:', err);
-      } finally {
-        setLoading(false);
-      }
-    }
-    fetchData();
-  }, []);
-
-  const totalScans = recentScans.length;
-  const avgScore = recentScans.length > 0
-    ? Math.round(recentScans.reduce((sum, s) => sum + (s.accessibilityScore || 0), 0) / recentScans.length)
-    : 0;
-  const totalViolations = recentScans.reduce((sum, s) => sum + (s.totalViolations || 0), 0);
-  const criticalTotal = recentScans.reduce((sum, s) => sum + (s.criticalIssues || 0), 0);
-
-  if (loading) {
-    return (
-      <div>
-        <div className="page-header">
-          <div className="skeleton" style={{ width: 200, height: 32, marginBottom: 8 }} />
-          <div className="skeleton" style={{ width: 300, height: 16 }} />
-        </div>
-        <div className="stats-grid">
-          {[1, 2, 3, 4].map(i => (
-            <div key={i} className="skeleton" style={{ height: 120 }} />
-          ))}
-        </div>
-      </div>
-    );
-  }
-
+export default function LandingPage() {
   return (
-    <div className="animate-fade-in">
-      <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <div>
-          <h1 className="page-title">Dashboard</h1>
-          <p className="page-subtitle">Overview of your accessibility audit projects</p>
-        </div>
-        <Link href="/projects/new" className="btn btn-primary">
-          <Plus size={16} />
-          New Project
-        </Link>
-      </div>
+    <div className="landing-container" style={{ background: 'var(--bg-primary)', minHeight: '100vh', overflowX: 'hidden' }}>
+      {/* Decorative Background Elements */}
+      <div className="glow-top" />
+      <div className="glow-bottom" />
 
-      {/* Stats */}
-      <div className="stats-grid" style={{ marginBottom: 32 }}>
-        <div className="glass-card-static" style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <div style={{ padding: 12, borderRadius: 'var(--radius-sm)', background: 'rgba(99, 102, 241, 0.15)' }}>
-            <FolderIcon />
-          </div>
-          <div>
-            <div style={{ fontSize: 28, fontWeight: 800, color: 'var(--text-primary)' }}>{projects.length}</div>
-            <div style={{ fontSize: 12, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Projects</div>
-          </div>
+      {/* Hero Section */}
+      <section className="hero" style={{ 
+        padding: '120px 24px 80px', 
+        textAlign: 'center', 
+        maxWidth: 1000, 
+        margin: '0 auto',
+        position: 'relative',
+        zIndex: 1
+      }}>
+        <div className="badge-wrapper animate-fade-in" style={{ marginBottom: 24 }}>
+          <span className="glass-badge">
+            <Zap size={14} className="text-accent" />
+            HackNiche 4.0 Standard
+          </span>
         </div>
+        
+        <h1 className="hero-title animate-slide-up" style={{ 
+          fontSize: 'clamp(40px, 8vw, 72px)', 
+          fontWeight: 800, 
+          lineHeight: 1.1,
+          marginBottom: 24,
+          letterSpacing: '-0.02em',
+          background: 'linear-gradient(to bottom, #fff 40%, rgba(255,255,255,0.7))',
+          WebkitBackgroundClip: 'text',
+          WebkitTextFillColor: 'transparent'
+        }}>
+          Automate Accessibility <br />
+          <span style={{ color: 'var(--accent-primary)', WebkitTextFillColor: 'initial' }}>With Precision AI</span>
+        </h1>
 
-        <div className="glass-card-static" style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <div style={{ padding: 12, borderRadius: 'var(--radius-sm)', background: 'rgba(34, 197, 94, 0.15)' }}>
-            <TrendingUp size={24} color="var(--success)" />
-          </div>
-          <div>
-            <div style={{ fontSize: 28, fontWeight: 800, color: 'var(--text-primary)' }}>{avgScore || '—'}</div>
-            <div style={{ fontSize: 12, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Avg Score</div>
-          </div>
-        </div>
+        <p className="hero-description animate-slide-up" style={{ 
+          fontSize: 'clamp(16px, 1.2vw, 20px)', 
+          color: 'var(--text-secondary)', 
+          maxWidth: 600, 
+          margin: '0 auto 40px',
+          lineHeight: 1.6
+        }}>
+          The enterprise-grade auditing platform that scans, identifies, and fixes WCAG violations in seconds. Bridge the gap between audit and remediation.
+        </p>
 
-        <div className="glass-card-static" style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <div style={{ padding: 12, borderRadius: 'var(--radius-sm)', background: 'var(--severity-serious-bg)' }}>
-            <AlertTriangle size={24} color="var(--severity-serious)" />
-          </div>
-          <div>
-            <div style={{ fontSize: 28, fontWeight: 800, color: 'var(--text-primary)' }}>{totalViolations}</div>
-            <div style={{ fontSize: 12, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Total Issues</div>
-          </div>
-        </div>
-
-        <div className="glass-card-static" style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <div style={{ padding: 12, borderRadius: 'var(--radius-sm)', background: 'var(--severity-critical-bg)' }}>
-            <Shield size={24} color="var(--severity-critical)" />
-          </div>
-          <div>
-            <div style={{ fontSize: 28, fontWeight: 800, color: 'var(--text-primary)' }}>{criticalTotal}</div>
-            <div style={{ fontSize: 12, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Critical</div>
-          </div>
-        </div>
-      </div>
-
-      {/* Projects */}
-      <div style={{ marginBottom: 32 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-          <h2 style={{ fontSize: 18, fontWeight: 600 }}>Projects</h2>
-          <Link href="/projects" className="btn btn-ghost btn-sm">
-            View all <ArrowRight size={14} />
+        <div className="hero-btns animate-slide-up" style={{ display: 'flex', gap: 16, justifyContent: 'center' }}>
+          <Link href="/dashboard" className="btn btn-primary btn-lg">
+            Start Auditing Free
+            <ArrowRight size={18} />
+          </Link>
+          <Link href="/projects" className="btn btn-ghost btn-lg">
+            View Projects
           </Link>
         </div>
+      </section>
 
-        {projects.length === 0 ? (
-          <div className="glass-card-static empty-state">
-            <Globe size={48} />
-            <h3 style={{ fontSize: 18, fontWeight: 600, marginTop: 8 }}>No projects yet</h3>
-            <p style={{ color: 'var(--text-muted)', marginBottom: 16 }}>Create your first project to start auditing</p>
-            <Link href="/projects/new" className="btn btn-primary">
-              <Plus size={16} /> Create Project
-            </Link>
+      {/* Stats/Social Proof Section */}
+      <section className="stats animate-fade-in" style={{ 
+        padding: '40px 24px', 
+        maxWidth: 1200, 
+        margin: '0 auto',
+        display: 'flex',
+        justifyContent: 'center',
+        gap: 'clamp(32px, 5vw, 80px)',
+        flexWrap: 'wrap',
+        borderTop: '1px solid var(--border-subtle)',
+        borderBottom: '1px solid var(--border-subtle)'
+      }}>
+        {[
+          { label: 'Rules Tested', value: '96+' },
+          { label: 'False Positives', value: '0%' },
+          { label: 'Security Checks', value: '15+' },
+          { label: 'AI Resolution', value: 'Instant' },
+        ].map((stat, i) => (
+          <div key={i} style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--text-primary)' }}>{stat.value}</div>
+            <div style={{ fontSize: 13, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px' }}>{stat.label}</div>
           </div>
-        ) : (
-          <div className="grid-cards">
-            {projects.slice(0, 6).map((project) => (
-              <Link key={project._id} href={`/projects/${project._id}`} style={{ textDecoration: 'none' }}>
-                <div className="glass-card" style={{ cursor: 'pointer' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-                    <div style={{ padding: 8, borderRadius: 'var(--radius-sm)', background: 'var(--accent-glow)' }}>
-                      <Globe size={18} color="var(--accent-primary)" />
-                    </div>
-                    <div>
-                      <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-primary)' }}>{project.name}</div>
-                      <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{project.baseUrl}</div>
-                    </div>
-                  </div>
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                    Created {new Date(project.createdAt).toLocaleDateString()}
-                  </div>
-                </div>
-              </Link>
-            ))}
-          </div>
-        )}
-      </div>
+        ))}
+      </section>
 
-      {/* Recent Scans */}
-      {recentScans.length > 0 && (
-        <div>
-          <h2 style={{ fontSize: 18, fontWeight: 600, marginBottom: 16 }}>Recent Scans</h2>
-          <div className="glass-card-static table-container">
-            <table>
-              <thead>
-                <tr>
-                  <th>Status</th>
-                  <th>Score</th>
-                  <th>Issues</th>
-                  <th>Pages</th>
-                  <th>Date</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {recentScans.map((scan) => (
-                  <tr key={scan._id}>
-                    <td>
-                      <span className={`badge badge-${scan.status === 'COMPLETED' ? 'success' : scan.status === 'FAILED' ? 'critical' : 'pending'}`}>
-                        {scan.status === 'COMPLETED' ? <CheckCircle size={12} /> : scan.status === 'PROCESSING' ? <Clock size={12} /> : null}
-                        {scan.status}
-                      </span>
-                    </td>
-                    <td style={{ fontWeight: 700, color: getScoreColor(scan.accessibilityScore) }}>
-                      {scan.accessibilityScore || '—'}
-                    </td>
-                    <td>{scan.totalViolations}</td>
-                    <td>{scan.pagesScanned}</td>
-                    <td style={{ color: 'var(--text-muted)', fontSize: 13 }}>
-                      {scan.completedAt ? new Date(scan.completedAt).toLocaleDateString() : '—'}
-                    </td>
-                    <td>
-                      <Link href={`/scans/${scan._id}`} className="btn btn-ghost btn-sm">
-                        View <ArrowRight size={12} />
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+      {/* Features Grid */}
+      <section id="features" style={{ padding: '100px 24px', maxWidth: 1200, margin: '0 auto' }}>
+        <div style={{ textAlign: 'center', marginBottom: 64 }}>
+          <h2 style={{ fontSize: 32, fontWeight: 700, marginBottom: 16 }}>Enterprise Audit Engine</h2>
+          <p style={{ color: 'var(--text-secondary)', maxWidth: 600, margin: '0 auto' }}>
+            Powered by Playwright and axe-core, our platform provides deep DOM analysis and deterministic remediation.
+          </p>
         </div>
-      )}
+
+        <div className="feature-grid" style={{ 
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', 
+          gap: 24 
+        }}>
+          <FeatureCard 
+            icon={<Search className="text-accent" />}
+            title="Multi-Page Discovery"
+            description="Deep crawl through sitemaps, DOM links, and SPA history to discover every hidden route in your application."
+          />
+          <FeatureCard 
+            icon={<Shield className="text-accent" />}
+            title="Visual Explorer"
+            description="Interactively explore violations with canvas-based bounding box overlays on a real-time proxied version of your site."
+          />
+          <FeatureCard 
+            icon={<Code2 className="text-accent" />}
+            title="AI Remediation"
+            description="Context-aware accessibility fixes powered by Featherless.ai. Get production-ready ARIA and HTML snippets instantly."
+          />
+          <FeatureCard 
+            icon={<Zap className="text-accent" />}
+            title="CDP Deep Insights"
+            description="Access the computed accessibility tree and emulate vision deficiencies to understand the true user experience."
+          />
+          <FeatureCard 
+            icon={<Globe className="text-accent" />}
+            title="Security Analysis"
+            description="Audit SSL certificates, security headers (CSP, HSTS), and SSRF vulnerabilities while you scan for accessibility."
+          />
+          <FeatureCard 
+            icon={<Layout className="text-accent" />}
+            title="Executive Reports"
+            description="Generate high-level trends and severity distributions to track your compliance progress over time."
+          />
+        </div>
+      </section>
+
+      {/* CTA Section */}
+      <section style={{ padding: '80px 24px 140px' }}>
+        <div className="glass-card-static" style={{ 
+          maxWidth: 900, 
+          margin: '0 auto', 
+          padding: '64px 24px', 
+          textAlign: 'center',
+          background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(168, 85, 247, 0.1) 100%)',
+          border: '1px solid rgba(99, 102, 241, 0.2)'
+        }}>
+          <h2 style={{ fontSize: 36, fontWeight: 800, marginBottom: 20 }}>Ready to bridge the accessibility gap?</h2>
+          <p style={{ color: 'var(--text-secondary)', marginBottom: 32, maxWidth: 500, margin: '0 auto 32px' }}>
+            Join hundreds of developers using Intellects to build a more inclusive web. No credit card required.
+          </p>
+          <Link href="/dashboard" className="btn btn-primary btn-lg">
+            Launch Your First Audit
+            <ArrowRight size={18} />
+          </Link>
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer style={{ 
+        padding: '40px 24px', 
+        borderTop: '1px solid var(--border-subtle)',
+        textAlign: 'center',
+        color: 'var(--text-muted)',
+        fontSize: 14
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'center', gap: 24, marginBottom: 16 }}>
+          <Link href="/dashboard" className="nav-link">Dashboard</Link>
+          <Link href="/projects" className="nav-link">Projects</Link>
+          <Link href="/projects/new" className="nav-link">New Scan</Link>
+        </div>
+        <p>© 2026 Intellects Accessibility Platform. HackNiche 4.0 Submission.</p>
+      </footer>
+
+      <style jsx>{`
+        .glow-top {
+          position: absolute;
+          top: -20%;
+          left: 50%;
+          transform: translateX(-50%);
+          width: 80vw;
+          height: 60vh;
+          background: radial-gradient(circle, rgba(99, 102, 241, 0.1) 0%, transparent 70%);
+          pointer-events: none;
+        }
+        .glow-bottom {
+          position: absolute;
+          bottom: 20%;
+          right: -10%;
+          width: 50vw;
+          height: 50vh;
+          background: radial-gradient(circle, rgba(168, 85, 247, 0.05) 0%, transparent 70%);
+          pointer-events: none;
+        }
+        .glass-badge {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          padding: 6px 14px;
+          background: rgba(255, 255, 255, 0.03);
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          border-radius: 100px;
+          font-size: 13px;
+          font-weight: 500;
+          color: var(--text-secondary);
+        }
+        .text-accent {
+          color: var(--accent-primary);
+        }
+        .btn-lg {
+          padding: 14px 28px;
+          font-size: 16px;
+        }
+        .nav-link {
+          color: var(--text-muted);
+          text-decoration: none;
+          transition: color 0.2s;
+        }
+        .nav-link:hover {
+          color: var(--text-primary);
+        }
+      `}</style>
     </div>
   );
 }
 
-function FolderIcon() {
-  return <Globe size={24} color="var(--accent-primary)" />;
-}
-
-function getScoreColor(score: number): string {
-  if (score >= 90) return 'var(--success)';
-  if (score >= 70) return 'var(--severity-moderate)';
-  if (score >= 50) return 'var(--severity-serious)';
-  return 'var(--severity-critical)';
+function FeatureCard({ icon, title, description }: { icon: React.ReactNode, title: string, description: string }) {
+  return (
+    <div className="glass-card" style={{ padding: 32, textAlign: 'left', height: '100%', display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div style={{ 
+        width: 48, 
+        height: 48, 
+        borderRadius: 12, 
+        background: 'rgba(99, 102, 241, 0.1)', 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'center',
+        marginBottom: 8
+      }}>
+        {icon}
+      </div>
+      <div>
+        <h3 style={{ fontSize: 20, fontWeight: 600, marginBottom: 12 }}>{title}</h3>
+        <p style={{ color: 'var(--text-secondary)', lineHeight: 1.6, fontSize: 15 }}>{description}</p>
+      </div>
+    </div>
+  );
 }
