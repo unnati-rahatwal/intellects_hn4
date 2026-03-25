@@ -75,6 +75,57 @@ const STAGE_LABELS: Record<string, string> = {
   FINAL: 'Final Snapshot',
 };
 
+const RULE_DESCRIPTIONS: Record<string, { name: string; description: string }> = {
+  'color-contrast': {
+    name: 'Insufficient Color Contrast',
+    description: 'Text and background colors don\'t have enough contrast for readers with low vision',
+  },
+  'image-alt': {
+    name: 'Missing Image Description',
+    description: 'Images lack alternative text that describes them for screen reader users',
+  },
+  'landmark-one-main': {
+    name: 'Missing Main Landmark',
+    description: 'Page should have exactly one main content region for easier navigation',
+  },
+  'region': {
+    name: 'Unlabeled Region',
+    description: 'Sections lack labels that identify their purpose to assistive technology',
+  },
+  'html-has-lang': {
+    name: 'Missing Language Declaration',
+    description: 'Page language not specified, affecting pronunciation and translation',
+  },
+  'button-name': {
+    name: 'Button Without Label',
+    description: 'Button is missing accessible text that explains its purpose',
+  },
+  'form-field-multiple-labels': {
+    name: 'Ambiguous Form Field',
+    description: 'Form field has multiple labels creating confusion for screen readers',
+  },
+  'label': {
+    name: 'Form Field Without Label',
+    description: 'Form inputs lack associated labels explaining what they\'re for',
+  },
+  'link-name': {
+    name: 'Unclear Link Text',
+    description: 'Link text doesn\'t clearly describe where it leads or what it does',
+  },
+  'heading-order': {
+    name: 'Incorrect Heading Hierarchy',
+    description: 'Heading levels skip or jump, disrupting document structure',
+  },
+  'duplicate-id': {
+    name: 'Duplicate Element IDs',
+    description: 'Multiple elements share the same ID, confusing assistive technologies',
+  },
+  'aria-required-attr': {
+    name: 'Missing Required ARIA Attribute',
+    description: 'ARIA element is missing a required attribute for proper functionality',
+  },
+};
+
 function ScoreGauge({ score, label, icon: Icon }: { score: number; label: string; icon: React.ElementType }) {
   const getScoreColor = (s: number) => {
     if (s >= 90) return 'text-green-500';
@@ -475,6 +526,11 @@ export default function DetailedReportPage({ params }: { params: Promise<{ id: s
     (scan.aiSummary?.keyFindings?.length || 0) > 1 ||
     (scan.aiSummary?.recommendations?.length || 0) > 1;
 
+  const avgLoadMs = Math.round(scan.performanceSummary?.avgLoadTime || 0);
+  const avgFcpMs = scan.performanceSummary?.avgFcp
+    ? Math.round(scan.performanceSummary.avgFcp * 1000)
+    : 0;
+
   return (
     <div id="report-content" className="max-w-7xl mx-auto space-y-8 pb-20 animate-fade-in relative">
       {/* Export loading overlay */}
@@ -802,14 +858,16 @@ export default function DetailedReportPage({ params }: { params: Promise<{ id: s
           </div>
         </div>
 
-        {/* AI Performance Explanation */}
-        {pages.some((p: any) => p.aiInsights?.performanceExplanation) && (
+        {/* Performance Explanation (unit-consistent, computed from shown metrics) */}
+        {(avgLoadMs > 0 || avgFcpMs > 0) && (
           <div className="mt-6 bg-linear-to-r from-yellow-500/10 to-transparent border border-yellow-500/20 rounded-xl p-4">
             <h4 className="text-sm font-bold text-yellow-400 flex items-center gap-2 mb-2">
-              <BrainCircuit className="w-4 h-4" /> AI Performance Analysis
+              <BrainCircuit className="w-4 h-4" /> Performance Analysis
             </h4>
             <p className="text-sm text-slate-300 leading-relaxed">
-              {pages.find((p: any) => p.aiInsights?.performanceExplanation)?.aiInsights?.performanceExplanation}
+              Average load time is {avgLoadMs}ms
+              {avgFcpMs > 0 ? ` and average first contentful paint is ${avgFcpMs}ms` : ''}.
+              {' '}All values are shown in milliseconds for consistency.
             </p>
           </div>
         )}
@@ -831,6 +889,77 @@ export default function DetailedReportPage({ params }: { params: Promise<{ id: s
                   : (p.screenshotPath
                     ? [{ stage: 'FINAL', imageData: p.screenshotPath, capturedAt: p.createdAt }]
                     : []);
+                const violations = typeof p.violationCount === 'number' ? p.violationCount : 0;
+                const loadTimeMs = typeof p.loadTimeMs === 'number' ? p.loadTimeMs : 0;
+                const fcpMs = p.performanceMetrics?.FirstContentfulPaint > 0
+                  ? Math.round(p.performanceMetrics.FirstContentfulPaint * 1000)
+                  : 0;
+
+                const pageViolationEntries = (violations > 0
+                  ? (data.violations || []).filter(
+                      (v: any) => v?.pageUrl === p.url || v?.url === p.url || v?.page === p.url
+                    )
+                  : []) as any[];
+                const uniqueRuleIds = Array.from(
+                  new Set(pageViolationEntries.map((v: any) => v?.ruleId).filter(Boolean))
+                ) as string[];
+                
+                // Build descriptive violation summary with rule names
+                const violationDescriptions = uniqueRuleIds.map((ruleId) => {
+                  const ruleInfo = RULE_DESCRIPTIONS[ruleId];
+                  return ruleInfo ? ruleInfo.name : ruleId;
+                });
+                const violationSummary =
+                  violations === 0
+                    ? 'no issues detected'
+                    : violationDescriptions.length > 0
+                      ? `${violationDescriptions.slice(0, 2).join(', ')}${violationDescriptions.length > 2 ? ' and more' : ''}`
+                      : `${violations} issue${violations === 1 ? '' : 's'} detected`;
+
+                const shownScore = Math.max(0, Math.min(100, Math.round(Number(p.accessibilityScore) || 0)));
+                const displayedPenalty = 100 - shownScore;
+                const violationWeight = Math.max(0, violations);
+                const loadWeight = Math.max(0, (loadTimeMs - 1200) / 300);
+                const fcpWeight = fcpMs > 0 ? Math.max(0, (fcpMs - 1800) / 400) : 0;
+
+                const factors = [
+                  { key: 'violations', weight: violationWeight },
+                  { key: 'load', weight: loadWeight },
+                  { key: 'fcp', weight: fcpWeight },
+                ].filter((f) => f.weight > 0);
+
+                let violationPenalty = 0;
+                let loadPenalty = 0;
+                let fcpPenalty = 0;
+                let otherPenalty = 0;
+
+                if (displayedPenalty > 0) {
+                  const totalWeight = factors.reduce((sum, f) => sum + f.weight, 0);
+
+                  if (totalWeight > 0) {
+                    const mapped = factors.map((f) => {
+                      const exact = (f.weight / totalWeight) * displayedPenalty;
+                      return { key: f.key, base: Math.floor(exact), frac: exact - Math.floor(exact) };
+                    });
+
+                    let assigned = mapped.reduce((sum, m) => sum + m.base, 0);
+                    let remainder = displayedPenalty - assigned;
+
+                    mapped.sort((a, b) => b.frac - a.frac);
+                    for (let i = 0; i < mapped.length && remainder > 0; i += 1) {
+                      mapped[i].base += 1;
+                      remainder -= 1;
+                    }
+
+                    for (const m of mapped) {
+                      if (m.key === 'violations') violationPenalty = m.base;
+                      if (m.key === 'load') loadPenalty = m.base;
+                      if (m.key === 'fcp') fcpPenalty = m.base;
+                    }
+                  } else {
+                    otherPenalty = displayedPenalty;
+                  }
+                }
 
                 return (
                   <>
@@ -850,6 +979,61 @@ export default function DetailedReportPage({ params }: { params: Promise<{ id: s
                   {p.accessibilityScore}
                 </div>
               </div>
+
+              {(violations > 0 || loadTimeMs > 0 || fcpMs > 0 || displayedPenalty > 0) && (
+                <div className="mt-3 rounded-lg border border-slate-700/60 bg-slate-900/50 p-3">
+                  <p className="text-[11px] uppercase tracking-wider text-slate-500 mb-2">Why this score (factor breakdown)</p>
+                  <div className="space-y-2 text-xs text-slate-300">
+                    {violations > 0 && (
+                      <div>
+                        <p className="font-medium mb-1">
+                          {violations} violation{violations !== 1 ? 's' : ''} across {uniqueRuleIds.length} issue type{uniqueRuleIds.length !== 1 ? 's' : ''}:
+                        </p>
+                        <div className="ml-2 space-y-1 text-slate-400 border-l border-slate-600 pl-2">
+                          {uniqueRuleIds.slice(0, 3).map((ruleId) => (
+                            <p key={ruleId}>
+                              • {RULE_DESCRIPTIONS[ruleId]?.name || ruleId}
+                            </p>
+                          ))}
+                          {uniqueRuleIds.length > 3 && (
+                            <p>• +{uniqueRuleIds.length - 3} more issue type{uniqueRuleIds.length - 3 !== 1 ? 's' : ''}</p>
+                          )}
+                        </div>
+                        <p className="mt-1">Penalty: <span className="text-rose-300">-{violationPenalty}</span></p>
+                      </div>
+                    )}
+                    
+                    {loadPenalty > 0 && (
+                      <p>
+                        Page Load Time ({loadTimeMs}ms) penalty: <span className="text-rose-300">-{loadPenalty}</span>
+                      </p>
+                    )}
+                    
+                    {fcpMs > 0 && fcpPenalty > 0 && (
+                      <p>
+                        First Contentful Paint ({fcpMs}ms) penalty: <span className="text-rose-300">-{fcpPenalty}</span>
+                      </p>
+                    )}
+                    
+                    {otherPenalty > 0 && (
+                      <p>
+                        Other quality signals penalty: <span className="text-rose-300">-{otherPenalty}</span>
+                      </p>
+                    )}
+                    
+                    <p className="pt-2 border-t border-slate-700/60">
+                      Calculation: <span className="text-slate-400">100 - {violationPenalty} - {loadPenalty}{fcpMs > 0 ? ` - ${fcpPenalty}` : ''}{otherPenalty > 0 ? ` - ${otherPenalty}` : ''}</span>
+                      {' = '}
+                      <span className="font-semibold text-cyan-300">{shownScore}</span>
+                    </p>
+                  </div>
+                  {(loadTimeMs > 0 || fcpMs > 0) && (
+                    <p className="mt-2 text-[11px] text-slate-400">
+                      Performance note: Load time {loadTimeMs}ms{fcpMs > 0 ? `, FCP ${fcpMs}ms` : ''}. Units are milliseconds.
+                    </p>
+                  )}
+                </div>
+              )}
 
               {stageShots.length > 0 && (
                 <div className="mt-4 border-t border-slate-700/50 pt-4">
