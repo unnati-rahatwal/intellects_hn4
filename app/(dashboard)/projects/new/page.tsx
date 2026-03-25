@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Globe, ArrowLeft, ScanSearch, Settings } from 'lucide-react';
 import Link from 'next/link';
@@ -17,6 +17,14 @@ export default function NewProjectPage() {
   const [startScan, setStartScan] = useState(true);
   const [discoverRoutes, setDiscoverRoutes] = useState(true);
   const [securityAudit, setSecurityAudit] = useState(true);
+
+  useEffect(() => {
+    // Auth Guard
+    const token = localStorage.getItem('token');
+    if (!token) {
+      router.push('/login');
+    }
+  }, [router]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();

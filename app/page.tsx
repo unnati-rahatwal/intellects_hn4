@@ -32,31 +32,7 @@ export default function Home() {
         </button>
       </div>
 
-      {/* Navbar (Minimal) */}
-      <header className="border-b border-white/5 backdrop-blur-md sticky top-0 z-40 bg-[#0A0F1C]/80">
-        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Accessibility className="text-cyan-400" size={28} />
-            <span className="text-xl font-black tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-indigo-400">
-              AccessIQ
-            </span>
-          </div>
-          <div className="flex gap-4 items-center">
-            <Link
-              href="/login"
-              className="text-sm font-medium hover:text-white transition-colors py-2"
-            >
-              Sign in
-            </Link>
-            <Link
-              href="/register"
-              className="text-sm font-medium bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg transition-colors text-white"
-            >
-              Get Started
-            </Link>
-          </div>
-        </div>
-      </header>
+      {/* Navbar removed - using global Navbar */}
 
       {/* 1. Hero Section */}
       <section className="relative pt-24 pb-32 overflow-hidden">
@@ -73,7 +49,7 @@ export default function Home() {
 
           <h1 className="text-5xl md:text-7xl lg:text-8xl font-black text-white tracking-tight mb-8 leading-[1.1]">
             See Your Website <br className="hidden md:block" /> the Way{" "}
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-indigo-400 to-purple-400 drop-shadow-sm">
+            <span className="text-transparent bg-clip-text bg-linear-to-r from-cyan-400 via-indigo-400 to-purple-400 drop-shadow-sm">
               Users Actually Experience It
             </span>
           </h1>
@@ -111,13 +87,13 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-6">
           <div className="text-center mb-20">
             <h2 className="text-4xl md:text-5xl font-black text-white mb-6">
-              Accessibility Isn’t Broken — It’s{" "}
+              Accessibility Isn&apos;t Broken — It&apos;s{" "}
               <span className="text-rose-500 line-through decoration-rose-500/50 decoration-4 underline-offset-4">
                 Invisible
               </span>
             </h2>
             <p className="text-xl text-slate-400 max-w-2xl mx-auto font-medium">
-              Developers don’t see the problem. Reports are confusing. Users
+              Developers don&apos;t see the problem. Reports are confusing. Users
               silently struggle in the background.
             </p>
           </div>
@@ -132,7 +108,6 @@ export default function Home() {
                 <div className="h-12 bg-[#1E293B] rounded-lg w-3/4 flex items-center px-4 shadow-sm border border-white/5">
                   <div className="w-1/2 h-4 bg-slate-700/50 rounded text-transparent"></div>
                 </div>
-                {/* Simulated perfectly rendered button */}
                 <div className="mt-8">
                   <div className="h-48 bg-[#1E293B] rounded-xl w-full flex flex-col items-center justify-center p-6 border border-white/5 shadow-sm">
                      <span className="text-slate-500 mb-6 font-medium">Pristine Component UI</span>
@@ -152,7 +127,7 @@ export default function Home() {
                 <MonitorOff size={14} /> Keyboard/Screen Reader Only
               </div>
               
-              <div className="mt-8 space-y-6 opacity-70 contrast-125 grayscale-[20%] transition-all group-hover:opacity-100">
+              <div className="mt-8 space-y-6 opacity-70 contrast-125 grayscale-20 transition-all group-hover:opacity-100">
                 <div className="h-12 bg-slate-800 rounded-lg w-3/4 ring-[3px] ring-amber-500/70 ring-offset-2 ring-offset-[#0A0F1C] shadow-[0_0_15px_rgba(245,158,11,0.3)]"></div>
                 
                 <div className="relative mt-8">
@@ -162,13 +137,12 @@ export default function Home() {
                       </div>
                   </div>
 
-                  {/* Fix Tooltip */}
                   <div className="absolute -bottom-6 -right-4 bg-rose-950/90 border border-rose-500 text-rose-200 text-sm p-4 rounded-lg shadow-2xl max-w-[260px] z-10 transition-transform translate-y-4 group-hover:translate-y-0 opacity-0 group-hover:opacity-100 backdrop-blur">
                     <div className="flex items-center gap-2 mb-1">
                       <Accessibility size={16} className="text-rose-400"/>
                       <span className="font-bold text-rose-400">Screen Reader Info:</span>
                     </div>
-                    "Unlabeled button. To activate press spacebar."
+                    &quot;Unlabeled button. To activate press spacebar.&quot;
                   </div>
                 </div>
               </div>
@@ -190,7 +164,7 @@ export default function Home() {
           </div>
 
           <div className="grid md:grid-cols-4 gap-8 relative">
-            <div className="hidden md:block absolute top-[48px] left-[12%] right-[12%] h-[2px] bg-gradient-to-r from-transparent via-cyan-500/40 to-transparent"></div>
+            <div className="hidden md:block absolute top-[48px] left-[12%] right-[12%] h-[2px] bg-linear-to-r from-transparent via-cyan-500/40 to-transparent"></div>
 
             {[
               {
@@ -220,12 +194,12 @@ export default function Home() {
             ].map((item, i) => (
               <div
                 key={i}
-                className="relative bg-white/[0.02] border border-white/5 p-8 rounded-2xl hover:bg-white/[0.05] transition-all z-10 backdrop-blur-sm group hover:-translate-y-1 hover:border-white/10 shadow-lg hover:shadow-cyan-900/10"
+                className="relative bg-white/2 border border-white/5 p-8 rounded-2xl hover:bg-white/5 transition-all z-10 backdrop-blur-sm group hover:-translate-y-1 hover:border-white/10 shadow-lg hover:shadow-cyan-900/10"
               >
                 <div className="w-16 h-16 rounded-2xl bg-slate-900/80 border border-white/10 flex items-center justify-center mb-6 shadow-inner group-hover:scale-110 transition-transform">
                   {item.icon}
                 </div>
-                <div className="text-5xl font-black text-white/5 absolute top-6 right-6 user-select-none">
+                <div className="text-5xl font-black text-white/5 absolute top-6 right-6 select-none leading-none">
                   {item.step}
                 </div>
                 <h3 className="text-2xl font-bold text-white mb-3 tracking-tight">
@@ -307,7 +281,6 @@ export default function Home() {
 
       {/* 5. Interactive Demo Preview */}
       <section id="demo" className="py-32 relative overflow-hidden">
-        {/* Glow behind demo box */}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[60%] h-[60%] bg-indigo-600/10 blur-[150px] rounded-full pointer-events-none" />
 
         <div className="max-w-5xl mx-auto px-6 relative z-10">
@@ -321,7 +294,6 @@ export default function Home() {
           </div>
 
           <div className="bg-[#181825] rounded-2xl border border-white/10 shadow-2xl shadow-indigo-500/10 overflow-hidden">
-            {/* Fake browser header */}
             <div className="h-14 bg-[#1E1E2E] flex items-center px-6 gap-3 border-b border-white/5">
               <div className="flex gap-2">
                 <div className="w-3.5 h-3.5 rounded-full bg-rose-500/90 shadow-[0_0_10px_rgba(244,63,94,0.4)]"></div>
@@ -333,9 +305,7 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Fake Website Mock Area */}
             <div className="p-10 relative min-h-[500px]">
-              {/* Highlight Overlay - Critical Issue */}
               <div className="absolute top-32 right-32 w-[280px] h-[55px] border-2 border-dashed border-rose-500 bg-rose-500/20 rounded-lg animate-pulse group cursor-crosshair z-20">
                 <div className="absolute -bottom-36 right-0 bg-[#1E1E2E] border border-rose-500/50 p-5 rounded-xl shadow-2xl shadow-rose-900/20 w-80 opacity-0 group-hover:opacity-100 transition-opacity z-30 pointer-events-none">
                   <div className="flex items-center justify-between mb-3">
@@ -343,14 +313,14 @@ export default function Home() {
                       <Zap size={16} className="text-rose-400" />
                       <span className="text-sm font-black tracking-tight text-white uppercase">Missing ARIA Label</span>
                     </div>
-                    <span className="text-[10px] font-bold bg-rose-500/20 text-rose-400 px-2 py-0.5 rounded text-uppercase">Critical</span>
+                    <span className="text-[10px] font-bold bg-rose-500/20 text-rose-400 px-2 py-0.5 rounded uppercase">Critical</span>
                   </div>
                   <p className="text-sm text-slate-400 mb-4 leading-relaxed font-medium">
-                    Screen readers announce this checkout button as "Unlabeled button". Users cannot identify the action.
+                    Screen readers announce this checkout button as &quot;Unlabeled button&quot;. Users cannot identify the action.
                   </p>
                   <div className="bg-[#11111A] p-3 rounded-md text-xs font-mono text-slate-300 border border-white/5 mb-3 leading-loose shadow-inner">
-                    <span className="text-rose-400 line-through mr-3 opacity-60">{"<button>"}</span><br/>
-                    <span className="text-emerald-400">+ {"<button aria-label='Proceed to Checkout'>"}</span>
+                    <span className="text-rose-400 line-through mr-3 opacity-60">&lt;button&gt;</span><br/>
+                    <span className="text-emerald-400">+ &lt;button aria-label=&apos;Proceed to Checkout&apos;&gt;</span>
                   </div>
                   <div className="flex items-center justify-center w-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm py-2 rounded-md font-bold transition-colors">
                     <Wrench size={16} className="mr-2"/> AI Suggested Fix Ready
@@ -358,7 +328,6 @@ export default function Home() {
                 </div>
               </div>
 
-               {/* Highlight Overlay - Passed Elements */}
                <div className="absolute top-10 left-10 w-[200px] h-[45px] border-2 border-emerald-500/50 bg-emerald-500/10 rounded-lg group cursor-crosshair z-20">
                   <div className="absolute top-14 left-0 bg-[#1E1E2E] border border-emerald-500/30 p-3 rounded-lg shadow-2xl opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-30">
                   <div className="flex items-center gap-2">
@@ -368,7 +337,6 @@ export default function Home() {
                 </div>
               </div>
 
-               {/* Highlight Overlay - Warning */}
                <div className="absolute bottom-24 left-32 w-[400px] h-[40px] border-2 border-dashed border-amber-500 bg-amber-500/10 rounded-lg group cursor-crosshair z-20">
                   <div className="absolute -top-24 left-0 bg-[#1E1E2E] border border-amber-500/40 p-4 rounded-xl shadow-2xl w-72 opacity-0 group-hover:opacity-100 transition-opacity z-30">
                   <div className="flex items-center gap-2 mb-2">
@@ -379,22 +347,16 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* Fake UI Wireframe Underneath */}
-              <div className="opacity-60 grayscale-[50%]">
+              <div className="opacity-60 grayscale">
                 <div className="w-48 h-10 bg-slate-300 rounded-md mb-20"></div>
-                
                 <div className="w-full max-w-2xl h-8 bg-slate-300 rounded-md mb-6"></div>
                 <div className="w-full max-w-3xl h-4 bg-slate-400 rounded mb-3"></div>
                 <div className="w-full max-w-lg h-4 bg-slate-400 rounded mb-12"></div>
-                
                 <div className="grid grid-cols-2 max-w-xl gap-6 mb-12">
                   <div className="h-14 bg-slate-200 rounded-lg border-2 border-slate-400"></div>
                   <div className="h-14 bg-slate-200 rounded-lg border-2 border-slate-400"></div>
                 </div>
-
                 <div className="max-w-xl h-10 bg-slate-300 rounded-md"></div>
-                
-                {/* The "Button" positioned near the issue */}
                 <div className="absolute top-32 right-32 w-[280px] h-[55px] bg-indigo-600 rounded-lg flex items-center justify-center text-white/90 font-bold shadow-lg">
                    Complete Order
                 </div>
@@ -405,9 +367,8 @@ export default function Home() {
       </section>
 
       {/* 6. Impact Section */}
-      <section className="py-32 bg-gradient-to-b from-[#0A0F1C] to-[#060913] border-t border-white/5 relative">
-        {/* Glow effect */}
-        <div className="absolute top-0 inset-x-0 h-px w-3/4 mx-auto bg-gradient-to-r from-transparent via-cyan-500/50 to-transparent"></div>
+      <section className="py-32 bg-linear-to-b from-[#0A0F1C] to-[#060913] border-t border-white/5 relative">
+        <div className="absolute top-0 inset-x-0 h-px w-3/4 mx-auto bg-linear-to-r from-transparent via-cyan-500/50 to-transparent"></div>
         
         <div className="max-w-5xl mx-auto px-6 text-center">
           <h2 className="text-4xl md:text-5xl font-black text-white mb-16">
@@ -420,7 +381,7 @@ export default function Home() {
                 1 in 6
               </div>
               <p className="text-slate-400 text-lg font-medium leading-relaxed">
-                People face significant accessibility challenges globally. Don't exclude potential users.
+                People face significant accessibility challenges globally. Don&apos;t exclude potential users.
               </p>
             </div>
             <div className="p-6">
@@ -441,23 +402,23 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="inline-block relative px-8 py-6 rounded-2xl border border-white/5 bg-white/[0.02]">
+          <div className="inline-block relative px-8 py-6 rounded-2xl border border-white/5 bg-white/2">
             <div className="absolute inset-0 bg-cyan-700/10 blur-2xl rounded-3xl"></div>
-            <h3 className="text-3xl md:text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white via-indigo-200 to-slate-400 relative z-10 italic tracking-tight">
-              "Accessibility is not a feature. <br className="sm:hidden" /> It’s usability."
+            <h3 className="text-3xl md:text-4xl font-bold bg-clip-text text-transparent bg-linear-to-r from-white via-indigo-200 to-slate-400 relative z-10 italic tracking-tight">
+              &quot;Accessibility is not a feature. <br className="sm:hidden" /> It&apos;s usability.&quot;
             </h3>
           </div>
         </div>
       </section>
 
       {/* 7. Call to Action */}
-      <section className="py-32 relative text-center overflow-hidden bg-gradient-to-t from-cyan-950/20 to-transparent">
-        <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-full max-w-3xl h-1 bg-gradient-to-r from-transparent via-cyan-500/80 to-transparent blur-[2px]"></div>
+      <section className="py-32 relative text-center overflow-hidden bg-linear-to-t from-cyan-950/20 to-transparent">
+        <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-full max-w-3xl h-1 bg-linear-to-r from-transparent via-cyan-500/80 to-transparent blur-[2px]"></div>
         
         <div className="max-w-4xl mx-auto px-6 relative z-10">
           <h2 className="text-5xl md:text-6xl font-black text-white mb-8 leading-tight tracking-tight">
             Make Your Web App Accessible — <br className="hidden md:block" />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-indigo-400">
+            <span className="text-transparent bg-clip-text bg-linear-to-r from-cyan-400 to-indigo-400">
               Without Guesswork.
             </span>
           </h2>

@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef, useCallback, use } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, ZoomIn, ZoomOut, Maximize2, List, Eye } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
 interface Violation {
   _id: string;
@@ -24,6 +25,7 @@ const SEVERITY_COLORS: Record<string, string> = {
 
 export default function VisualExplorerPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
+  const router = useRouter();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -38,6 +40,13 @@ export default function VisualExplorerPage({ params }: { params: Promise<{ id: s
   const [showPanel, setShowPanel] = useState(true);
 
   useEffect(() => {
+    // Auth Guard
+    const token = localStorage.getItem('token');
+    if (!token) {
+      router.push('/login');
+      return;
+    }
+
     async function fetchData() {
       try {
         const res = await fetch(`/api/scans/${id}/violations`);
@@ -55,7 +64,7 @@ export default function VisualExplorerPage({ params }: { params: Promise<{ id: s
       }
     }
     fetchData();
-  }, [id]);
+  }, [id, router]);
 
   const pageViolations = violations.filter(v => v.pageUrl === selectedPage);
 

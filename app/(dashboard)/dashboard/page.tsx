@@ -9,9 +9,10 @@ import {
   Clock,
   ArrowRight,
   Plus,
-  Globe,
   TrendingUp,
+  GlobeIcon as Globe,
 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
 interface Project {
   _id: string;
@@ -33,11 +34,19 @@ interface Scan {
 }
 
 export default function DashboardPage() {
+  const router = useRouter();
   const [projects, setProjects] = useState<Project[]>([]);
   const [recentScans, setRecentScans] = useState<Scan[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Auth Guard
+    const token = localStorage.getItem('token');
+    if (!token) {
+      router.push('/login');
+      return;
+    }
+
     async function fetchData() {
       try {
         const [projRes] = await Promise.all([
@@ -67,7 +76,7 @@ export default function DashboardPage() {
       }
     }
     fetchData();
-  }, []);
+  }, [router]);
 
   const avgScore = recentScans.length > 0
     ? Math.round(recentScans.reduce((sum, s) => sum + (s.accessibilityScore || 0), 0) / recentScans.length)

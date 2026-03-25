@@ -36,6 +36,13 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   const [scanning, setScanning] = useState(false);
 
   useEffect(() => {
+    // Auth Guard
+    const token = localStorage.getItem('token');
+    if (!token) {
+      router.push('/login');
+      return;
+    }
+
     async function fetchData() {
       try {
         const [projRes, scansRes] = await Promise.all([
@@ -53,7 +60,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
       }
     }
     fetchData();
-  }, [id]);
+  }, [id, router]);
 
   // Poll for active scans
   useEffect(() => {
