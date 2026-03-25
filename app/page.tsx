@@ -1,254 +1,531 @@
-'use client';
+"use client";
 
-import Link from 'next/link';
-import { 
-  Shield, 
-  Zap, 
-  Code2, 
-  Search, 
-  ArrowRight, 
-  Globe,
-  Layout
-} from 'lucide-react';
+import Link from "next/link";
+import { useState } from "react";
+import {
+  ArrowRight,
+  Search,
+  Eye,
+  EyeOff,
+  Wrench,
+  BarChart3,
+  LayoutDashboard,
+  MonitorOff,
+  Accessibility,
+  Zap,
+  Layout,
+  X,
+} from "lucide-react";
 
-export default function LandingPage() {
+export default function Home() {
+  const [isDemoOpen, setIsDemoOpen] = useState(false);
+
   return (
-    <div className="landing-container" style={{ background: 'var(--bg-primary)', minHeight: '100vh', overflowX: 'hidden' }}>
-      {/* Decorative Background Elements */}
-      <div className="glow-top" />
-      <div className="glow-bottom" />
-
-      {/* Hero Section */}
-      <section className="hero" style={{ 
-        padding: '120px 24px 80px', 
-        textAlign: 'center', 
-        maxWidth: 1000, 
-        margin: '0 auto',
-        position: 'relative',
-        zIndex: 1
-      }}>
-        <div className="badge-wrapper animate-fade-in" style={{ marginBottom: 24 }}>
-          <span className="glass-badge">
-            <Zap size={14} className="text-accent" />
-            HackNiche 4.0 Standard
+    <div className="min-h-screen bg-[#0A0F1C] text-slate-300 font-sans selection:bg-cyan-900 selection:text-cyan-50">
+      {/* Floating Badge */}
+      <div className="fixed bottom-6 right-6 z-50 animate-bounce">
+        <button className="flex items-center gap-2 bg-indigo-600/20 border border-indigo-500/50 backdrop-blur-md px-4 py-3 rounded-full text-indigo-300 shadow-[0_0_20px_rgba(79,70,229,0.3)] hover:bg-indigo-600/40 hover:scale-105 transition-all cursor-pointer">
+          <Zap size={16} className="text-yellow-400" />
+          <span className="text-sm font-medium pr-1">
+            Simulate Screen Reader Experience
           </span>
-        </div>
-        
-        <h1 className="hero-title animate-slide-up" style={{ 
-          fontSize: 'clamp(40px, 8vw, 72px)', 
-          fontWeight: 800, 
-          lineHeight: 1.1,
-          marginBottom: 24,
-          letterSpacing: '-0.02em',
-          background: 'linear-gradient(to bottom, #fff 40%, rgba(255,255,255,0.7))',
-          WebkitBackgroundClip: 'text',
-          WebkitTextFillColor: 'transparent'
-        }}>
-          Automate Accessibility <br />
-          <span style={{ color: 'var(--accent-primary)', WebkitTextFillColor: 'initial' }}>With Precision AI</span>
-        </h1>
+        </button>
+      </div>
 
-        <p className="hero-description animate-slide-up" style={{ 
-          fontSize: 'clamp(16px, 1.2vw, 20px)', 
-          color: 'var(--text-secondary)', 
-          maxWidth: 600, 
-          margin: '0 auto 40px',
-          lineHeight: 1.6
-        }}>
-          The enterprise-grade auditing platform that scans, identifies, and fixes WCAG violations in seconds. Bridge the gap between audit and remediation.
-        </p>
-
-        <div className="hero-btns animate-slide-up" style={{ display: 'flex', gap: 16, justifyContent: 'center' }}>
-          <Link href="/dashboard" className="btn btn-primary btn-lg">
-            Start Auditing Free
-            <ArrowRight size={18} />
-          </Link>
-          <Link href="/projects" className="btn btn-ghost btn-lg">
-            View Projects
-          </Link>
-        </div>
-      </section>
-
-      {/* Stats/Social Proof Section */}
-      <section className="stats animate-fade-in" style={{ 
-        padding: '40px 24px', 
-        maxWidth: 1200, 
-        margin: '0 auto',
-        display: 'flex',
-        justifyContent: 'center',
-        gap: 'clamp(32px, 5vw, 80px)',
-        flexWrap: 'wrap',
-        borderTop: '1px solid var(--border-subtle)',
-        borderBottom: '1px solid var(--border-subtle)'
-      }}>
-        {[
-          { label: 'Rules Tested', value: '96+' },
-          { label: 'False Positives', value: '0%' },
-          { label: 'Security Checks', value: '15+' },
-          { label: 'AI Resolution', value: 'Instant' },
-        ].map((stat, i) => (
-          <div key={i} style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--text-primary)' }}>{stat.value}</div>
-            <div style={{ fontSize: 13, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px' }}>{stat.label}</div>
+      {/* Navbar (Minimal) */}
+      <header className="border-b border-white/5 backdrop-blur-md sticky top-0 z-40 bg-[#0A0F1C]/80">
+        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Accessibility className="text-cyan-400" size={28} />
+            <span className="text-xl font-black tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-indigo-400">
+              AccessIQ
+            </span>
           </div>
-        ))}
+          <div className="flex gap-4 items-center">
+            <Link
+              href="/login"
+              className="text-sm font-medium hover:text-white transition-colors py-2"
+            >
+              Sign in
+            </Link>
+            <Link
+              href="/register"
+              className="text-sm font-medium bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg transition-colors text-white"
+            >
+              Get Started
+            </Link>
+          </div>
+        </div>
+      </header>
+
+      {/* 1. Hero Section */}
+      <section className="relative pt-24 pb-32 overflow-hidden">
+        {/* Neon Glow Effects */}
+        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-cyan-600/20 blur-[120px] rounded-full pointer-events-none" />
+
+        <div className="max-w-7xl mx-auto px-6 relative z-10 text-center">
+          <div className="inline-flex items-center justify-center gap-2 px-4 py-1.5 rounded-full bg-cyan-950/50 border border-cyan-500/30 text-cyan-300 text-sm font-medium mb-8">
+            <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse relative">
+              <span className="absolute inset-0 rounded-full bg-cyan-400 animate-ping opacity-75"></span>
+            </span>
+            WCAG 2.2 aligned · Multi-page analysis · AI-assisted fixes
+          </div>
+
+          <h1 className="text-5xl md:text-7xl lg:text-8xl font-black text-white tracking-tight mb-8 leading-[1.1]">
+            See Your Website <br className="hidden md:block" /> the Way{" "}
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-indigo-400 to-purple-400 drop-shadow-sm">
+              Users Actually Experience It
+            </span>
+          </h1>
+
+          <p className="text-xl md:text-2xl text-slate-400 max-w-3xl mx-auto mb-10 leading-relaxed font-medium">
+            Scan entire web applications, visualize accessibility barriers in real
+            context, and fix them instantly with AI-powered guidance.
+          </p>
+
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+            <Link
+              href="/register"
+              className="group relative px-8 py-4 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg font-bold text-lg transition-all shadow-[0_0_20px_rgba(8,145,178,0.4)] hover:shadow-[0_0_30px_rgba(8,145,178,0.5)] flex items-center gap-2"
+            >
+              Start Accessibility Scan
+              <ArrowRight
+                size={20}
+                className="group-hover:translate-x-1 transition-transform"
+              />
+            </Link>
+            <button
+              type="button"
+              onClick={() => setIsDemoOpen(true)}
+              className="px-8 py-4 bg-white/5 hover:bg-white/10 border border-white/10 text-white rounded-lg font-bold text-lg transition-all flex items-center gap-2 hover:shadow-[0_0_15px_rgba(255,255,255,0.1)]"
+            >
+              <Eye size={20} className="text-slate-400 group-hover:text-white" />
+              View Demo Analysis
+            </button>
+          </div>
+        </div>
       </section>
 
-      {/* Features Grid */}
-      <section id="features" style={{ padding: '100px 24px', maxWidth: 1200, margin: '0 auto' }}>
-        <div style={{ textAlign: 'center', marginBottom: 64 }}>
-          <h2 style={{ fontSize: 32, fontWeight: 700, marginBottom: 16 }}>Enterprise Audit Engine</h2>
-          <p style={{ color: 'var(--text-secondary)', maxWidth: 600, margin: '0 auto' }}>
-            Powered by Playwright and axe-core, our platform provides deep DOM analysis and deterministic remediation.
-          </p>
-        </div>
+      {/* 2. Problem -> Impact Section */}
+      <section className="py-32 bg-[#0F1629] border-y border-white/5 relative">
+        <div className="max-w-7xl mx-auto px-6">
+          <div className="text-center mb-20">
+            <h2 className="text-4xl md:text-5xl font-black text-white mb-6">
+              Accessibility Isn’t Broken — It’s{" "}
+              <span className="text-rose-500 line-through decoration-rose-500/50 decoration-4 underline-offset-4">
+                Invisible
+              </span>
+            </h2>
+            <p className="text-xl text-slate-400 max-w-2xl mx-auto font-medium">
+              Developers don’t see the problem. Reports are confusing. Users
+              silently struggle in the background.
+            </p>
+          </div>
 
-        <div className="feature-grid" style={{ 
-          display: 'grid', 
-          gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', 
-          gap: 24 
-        }}>
-          <FeatureCard 
-            icon={<Search className="text-accent" />}
-            title="Multi-Page Discovery"
-            description="Deep crawl through sitemaps, DOM links, and SPA history to discover every hidden route in your application."
-          />
-          <FeatureCard 
-            icon={<Shield className="text-accent" />}
-            title="Visual Explorer"
-            description="Interactively explore violations with canvas-based bounding box overlays on a real-time proxied version of your site."
-          />
-          <FeatureCard 
-            icon={<Code2 className="text-accent" />}
-            title="AI Remediation"
-            description="Context-aware accessibility fixes powered by Featherless.ai. Get production-ready ARIA and HTML snippets instantly."
-          />
-          <FeatureCard 
-            icon={<Zap className="text-accent" />}
-            title="CDP Deep Insights"
-            description="Access the computed accessibility tree and emulate vision deficiencies to understand the true user experience."
-          />
-          <FeatureCard 
-            icon={<Globe className="text-accent" />}
-            title="Security Analysis"
-            description="Audit SSL certificates, security headers (CSP, HSTS), and SSRF vulnerabilities while you scan for accessibility."
-          />
-          <FeatureCard 
-            icon={<Layout className="text-accent" />}
-            title="Executive Reports"
-            description="Generate high-level trends and severity distributions to track your compliance progress over time."
-          />
+          <div className="grid md:grid-cols-2 gap-0 overflow-hidden rounded-2xl border border-white/10 shadow-2xl">
+            {/* Developer View */}
+            <div className="p-10 md:p-14 bg-slate-900 border-r border-white/5 h-full flex flex-col justify-center relative group">
+              <div className="absolute top-4 left-4 text-xs font-mono font-bold tracking-wider text-emerald-400 bg-emerald-400/10 px-3 py-1.5 rounded uppercase flex items-center gap-2">
+                <Layout size={14} /> Normal View
+              </div>
+              <div className="mt-8 space-y-6">
+                <div className="h-12 bg-[#1E293B] rounded-lg w-3/4 flex items-center px-4 shadow-sm border border-white/5">
+                  <div className="w-1/2 h-4 bg-slate-700/50 rounded text-transparent"></div>
+                </div>
+                {/* Simulated perfectly rendered button */}
+                <div className="mt-8">
+                  <div className="h-48 bg-[#1E293B] rounded-xl w-full flex flex-col items-center justify-center p-6 border border-white/5 shadow-sm">
+                     <span className="text-slate-500 mb-6 font-medium">Pristine Component UI</span>
+                     <div className="bg-indigo-600 hover:bg-indigo-500 text-white px-8 py-3 rounded-md font-bold shadow-sm transition-colors cursor-pointer w-full text-center">
+                       Proceed to Checkout
+                     </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Screen Reader Experience */}
+            <div className="p-10 md:p-14 bg-slate-950 h-full flex flex-col justify-center relative group overflow-hidden">
+              <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-[0.03] pointer-events-none"></div>
+              
+              <div className="absolute top-4 left-4 text-xs font-mono font-bold tracking-wider text-rose-500 bg-rose-500/10 px-3 py-1.5 rounded uppercase shadow-[0_0_10px_rgba(244,63,94,0.2)] flex items-center gap-2">
+                <MonitorOff size={14} /> Keyboard/Screen Reader Only
+              </div>
+              
+              <div className="mt-8 space-y-6 opacity-70 contrast-125 grayscale-[20%] transition-all group-hover:opacity-100">
+                <div className="h-12 bg-slate-800 rounded-lg w-3/4 ring-[3px] ring-amber-500/70 ring-offset-2 ring-offset-[#0A0F1C] shadow-[0_0_15px_rgba(245,158,11,0.3)]"></div>
+                
+                <div className="relative mt-8">
+                  <div className="h-48 bg-slate-800 rounded-xl w-full flex items-center justify-center border border-rose-500/30 ring-2 ring-rose-500 shadow-[0_0_20px_rgba(244,63,94,0.2)]">
+                      <div className="px-8 py-3 bg-indigo-900 text-indigo-200/50 font-bold rounded-md opacity-50 blur-[2px]">
+                        Proceed to Checkout
+                      </div>
+                  </div>
+
+                  {/* Fix Tooltip */}
+                  <div className="absolute -bottom-6 -right-4 bg-rose-950/90 border border-rose-500 text-rose-200 text-sm p-4 rounded-lg shadow-2xl max-w-[260px] z-10 transition-transform translate-y-4 group-hover:translate-y-0 opacity-0 group-hover:opacity-100 backdrop-blur">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Accessibility size={16} className="text-rose-400"/>
+                      <span className="font-bold text-rose-400">Screen Reader Info:</span>
+                    </div>
+                    "Unlabeled button. To activate press spacebar."
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
-      {/* CTA Section */}
-      <section style={{ padding: '80px 24px 140px' }}>
-        <div className="glass-card-static" style={{ 
-          maxWidth: 900, 
-          margin: '0 auto', 
-          padding: '64px 24px', 
-          textAlign: 'center',
-          background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(168, 85, 247, 0.1) 100%)',
-          border: '1px solid rgba(99, 102, 241, 0.2)'
-        }}>
-          <h2 style={{ fontSize: 36, fontWeight: 800, marginBottom: 20 }}>Ready to bridge the accessibility gap?</h2>
-          <p style={{ color: 'var(--text-secondary)', marginBottom: 32, maxWidth: 500, margin: '0 auto 32px' }}>
-            Join hundreds of developers using Intellects to build a more inclusive web. No credit card required.
+      {/* 3. How It Works */}
+      <section className="py-32 relative">
+        <div className="max-w-7xl mx-auto px-6">
+          <div className="text-center mb-20">
+            <h2 className="text-4xl md:text-5xl font-black text-white mb-6">
+              How It Works
+            </h2>
+            <p className="text-xl text-slate-400 max-w-2xl mx-auto font-medium">
+              From URL to flawless accessibility in 4 simple steps.
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-4 gap-8 relative">
+            <div className="hidden md:block absolute top-[48px] left-[12%] right-[12%] h-[2px] bg-gradient-to-r from-transparent via-cyan-500/40 to-transparent"></div>
+
+            {[
+              {
+                step: "01",
+                title: "Enter Website URL",
+                desc: "Scan single or multiple pages automatically.",
+                icon: <Search size={28} className="text-cyan-400" />,
+              },
+              {
+                step: "02",
+                title: "Detect Real Issues",
+                desc: "Context-aware detection, not just basic rules.",
+                icon: <EyeOff size={28} className="text-rose-400" />,
+              },
+              {
+                step: "03",
+                title: "Explore Visually",
+                desc: "See exactly where and how users are affected.",
+                icon: <Layout size={28} className="text-amber-400" />,
+              },
+              {
+                step: "04",
+                title: "Fix with AI",
+                desc: "Get ready-to-use, optimized code fixes instantly.",
+                icon: <Wrench size={28} className="text-emerald-400" />,
+              },
+            ].map((item, i) => (
+              <div
+                key={i}
+                className="relative bg-white/[0.02] border border-white/5 p-8 rounded-2xl hover:bg-white/[0.05] transition-all z-10 backdrop-blur-sm group hover:-translate-y-1 hover:border-white/10 shadow-lg hover:shadow-cyan-900/10"
+              >
+                <div className="w-16 h-16 rounded-2xl bg-slate-900/80 border border-white/10 flex items-center justify-center mb-6 shadow-inner group-hover:scale-110 transition-transform">
+                  {item.icon}
+                </div>
+                <div className="text-5xl font-black text-white/5 absolute top-6 right-6 user-select-none">
+                  {item.step}
+                </div>
+                <h3 className="text-2xl font-bold text-white mb-3 tracking-tight">
+                  {item.title}
+                </h3>
+                <p className="text-slate-400 text-base leading-relaxed">
+                  {item.desc}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* 4. Core Features Section */}
+      <section className="py-32 bg-[#0F1629] border-y border-white/5">
+        <div className="max-w-7xl mx-auto px-6">
+          <div className="text-center mb-20">
+            <h2 className="text-3xl md:text-5xl font-black text-white mb-6">
+              Built for Deep Remediation
+            </h2>
+            <p className="text-xl text-slate-400 max-w-2xl mx-auto font-medium">
+              Beyond simple linters. Analyze context, understand failures, and
+              write compliant code effortlessly.
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[
+              {
+                title: "Multi-Page Flow Analysis",
+                desc: "Analyze complete user journeys, not isolated pages. Catch issues dynamically.",
+                icon: <LayoutDashboard className="text-cyan-400" size={24} />,
+              },
+              {
+                title: "Visual Issue Explorer",
+                desc: "Interactively highlight accessibility problems directly inside the UI.",
+                icon: <Eye className="text-rose-400" size={24} />,
+              },
+              {
+                title: "AI-Powered Remediation",
+                desc: "Get contextual fixes with semantic HTML, ARIA rules, and CSS improvements.",
+                icon: <Wrench className="text-purple-400" size={24} />,
+              },
+              {
+                title: "Accessibility Score & Tracking",
+                desc: "Monitor improvements across scans and versions to prove compliance.",
+                icon: <BarChart3 className="text-emerald-400" size={24} />,
+              },
+              {
+                title: "Project-Based Dashboard",
+                desc: "Manage multiple websites and compare accessibility health at a glance.",
+                icon: <Layout className="text-amber-400" size={24} />,
+              },
+              {
+                title: "Screen Reader Simulation",
+                desc: "Hear exactly how assistive technologies parse your application DOM.",
+                icon: <MonitorOff className="text-indigo-400" size={24} />,
+              },
+            ].map((f, i) => (
+              <div
+                key={i}
+                className="p-8 rounded-2xl bg-[#151D33] border border-white/5 hover:border-cyan-500/30 group transition-all"
+              >
+                <div className="w-14 h-14 rounded-xl bg-slate-900 border border-white/5 flex items-center justify-center mb-6 group-hover:bg-slate-800 transition-colors shadow-inner">
+                  {f.icon}
+                </div>
+                <h3 className="text-xl font-bold text-slate-100 mb-3 tracking-tight">
+                  {f.title}
+                </h3>
+                <p className="text-slate-400 leading-relaxed font-medium">
+                  {f.desc}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* 5. Interactive Demo Preview */}
+      <section id="demo" className="py-32 relative overflow-hidden">
+        {/* Glow behind demo box */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[60%] h-[60%] bg-indigo-600/10 blur-[150px] rounded-full pointer-events-none" />
+
+        <div className="max-w-5xl mx-auto px-6 relative z-10">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl md:text-5xl font-black text-white mb-6">
+              See It In Action
+            </h2>
+            <p className="text-xl text-slate-400 font-medium">
+              Hover over the highlights to understand the accessibility experience.
+            </p>
+          </div>
+
+          <div className="bg-[#181825] rounded-2xl border border-white/10 shadow-2xl shadow-indigo-500/10 overflow-hidden">
+            {/* Fake browser header */}
+            <div className="h-14 bg-[#1E1E2E] flex items-center px-6 gap-3 border-b border-white/5">
+              <div className="flex gap-2">
+                <div className="w-3.5 h-3.5 rounded-full bg-rose-500/90 shadow-[0_0_10px_rgba(244,63,94,0.4)]"></div>
+                <div className="w-3.5 h-3.5 rounded-full bg-amber-500/90 shadow-[0_0_10px_rgba(245,158,11,0.4)]"></div>
+                <div className="w-3.5 h-3.5 rounded-full bg-emerald-500/90 shadow-[0_0_10px_rgba(16,185,129,0.4)]"></div>
+              </div>
+              <div className="ml-6 bg-[#11111A] border border-white/5 text-sm font-medium text-slate-400 px-4 py-1.5 rounded-lg grow max-w-md flex items-center gap-3 shadow-inner">
+                <Search size={14} className="text-slate-500" /> example.com/checkout
+              </div>
+            </div>
+
+            {/* Fake Website Mock Area */}
+            <div className="p-10 relative min-h-[500px]">
+              {/* Highlight Overlay - Critical Issue */}
+              <div className="absolute top-32 right-32 w-[280px] h-[55px] border-2 border-dashed border-rose-500 bg-rose-500/20 rounded-lg animate-pulse group cursor-crosshair z-20">
+                <div className="absolute -bottom-36 right-0 bg-[#1E1E2E] border border-rose-500/50 p-5 rounded-xl shadow-2xl shadow-rose-900/20 w-80 opacity-0 group-hover:opacity-100 transition-opacity z-30 pointer-events-none">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <Zap size={16} className="text-rose-400" />
+                      <span className="text-sm font-black tracking-tight text-white uppercase">Missing ARIA Label</span>
+                    </div>
+                    <span className="text-[10px] font-bold bg-rose-500/20 text-rose-400 px-2 py-0.5 rounded text-uppercase">Critical</span>
+                  </div>
+                  <p className="text-sm text-slate-400 mb-4 leading-relaxed font-medium">
+                    Screen readers announce this checkout button as "Unlabeled button". Users cannot identify the action.
+                  </p>
+                  <div className="bg-[#11111A] p-3 rounded-md text-xs font-mono text-slate-300 border border-white/5 mb-3 leading-loose shadow-inner">
+                    <span className="text-rose-400 line-through mr-3 opacity-60">{"<button>"}</span><br/>
+                    <span className="text-emerald-400">+ {"<button aria-label='Proceed to Checkout'>"}</span>
+                  </div>
+                  <div className="flex items-center justify-center w-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm py-2 rounded-md font-bold transition-colors">
+                    <Wrench size={16} className="mr-2"/> AI Suggested Fix Ready
+                  </div>
+                </div>
+              </div>
+
+               {/* Highlight Overlay - Passed Elements */}
+               <div className="absolute top-10 left-10 w-[200px] h-[45px] border-2 border-emerald-500/50 bg-emerald-500/10 rounded-lg group cursor-crosshair z-20">
+                  <div className="absolute top-14 left-0 bg-[#1E1E2E] border border-emerald-500/30 p-3 rounded-lg shadow-2xl opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-30">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+                    <span className="text-xs font-bold text-emerald-300 uppercase tracking-wider">Heading Structure is valid</span>
+                  </div>
+                </div>
+              </div>
+
+               {/* Highlight Overlay - Warning */}
+               <div className="absolute bottom-24 left-32 w-[400px] h-[40px] border-2 border-dashed border-amber-500 bg-amber-500/10 rounded-lg group cursor-crosshair z-20">
+                  <div className="absolute -top-24 left-0 bg-[#1E1E2E] border border-amber-500/40 p-4 rounded-xl shadow-2xl w-72 opacity-0 group-hover:opacity-100 transition-opacity z-30">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
+                    <span className="text-xs font-bold text-white uppercase tracking-wider">Low Contrast (3.1:1)</span>
+                  </div>
+                  <p className="text-xs text-slate-400 font-medium leading-relaxed">Text color #888888 on #F1F5F9 fails WCAG AA standards. Requires 4.5:1 minimum.</p>
+                </div>
+              </div>
+
+              {/* Fake UI Wireframe Underneath */}
+              <div className="opacity-60 grayscale-[50%]">
+                <div className="w-48 h-10 bg-slate-300 rounded-md mb-20"></div>
+                
+                <div className="w-full max-w-2xl h-8 bg-slate-300 rounded-md mb-6"></div>
+                <div className="w-full max-w-3xl h-4 bg-slate-400 rounded mb-3"></div>
+                <div className="w-full max-w-lg h-4 bg-slate-400 rounded mb-12"></div>
+                
+                <div className="grid grid-cols-2 max-w-xl gap-6 mb-12">
+                  <div className="h-14 bg-slate-200 rounded-lg border-2 border-slate-400"></div>
+                  <div className="h-14 bg-slate-200 rounded-lg border-2 border-slate-400"></div>
+                </div>
+
+                <div className="max-w-xl h-10 bg-slate-300 rounded-md"></div>
+                
+                {/* The "Button" positioned near the issue */}
+                <div className="absolute top-32 right-32 w-[280px] h-[55px] bg-indigo-600 rounded-lg flex items-center justify-center text-white/90 font-bold shadow-lg">
+                   Complete Order
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* 6. Impact Section */}
+      <section className="py-32 bg-gradient-to-b from-[#0A0F1C] to-[#060913] border-t border-white/5 relative">
+        {/* Glow effect */}
+        <div className="absolute top-0 inset-x-0 h-px w-3/4 mx-auto bg-gradient-to-r from-transparent via-cyan-500/50 to-transparent"></div>
+        
+        <div className="max-w-5xl mx-auto px-6 text-center">
+          <h2 className="text-4xl md:text-5xl font-black text-white mb-16">
+            Why This Matters
+          </h2>
+
+          <div className="grid md:grid-cols-3 gap-10 mb-20 px-4">
+            <div className="p-6">
+              <div className="text-6xl font-black text-white mb-4 tracking-tighter drop-shadow-md">
+                1 in 6
+              </div>
+              <p className="text-slate-400 text-lg font-medium leading-relaxed">
+                People face significant accessibility challenges globally. Don't exclude potential users.
+              </p>
+            </div>
+            <div className="p-6">
+              <div className="text-6xl font-black text-rose-500 mb-4 tracking-tighter drop-shadow-[0_0_15px_rgba(244,63,94,0.3)]">
+                Risk
+              </div>
+              <p className="text-slate-400 text-lg font-medium leading-relaxed">
+                Poor accessibility leads to lost customers and severe legal liability in many countries.
+              </p>
+            </div>
+            <div className="p-6">
+              <div className="text-6xl font-black text-emerald-400 mb-4 tracking-tighter drop-shadow-[0_0_15px_rgba(16,185,129,0.3)]">
+                Reward
+              </div>
+              <p className="text-slate-400 text-lg font-medium leading-relaxed">
+                Better accessibility always equals better user experience and SEO for everyone.
+              </p>
+            </div>
+          </div>
+
+          <div className="inline-block relative px-8 py-6 rounded-2xl border border-white/5 bg-white/[0.02]">
+            <div className="absolute inset-0 bg-cyan-700/10 blur-2xl rounded-3xl"></div>
+            <h3 className="text-3xl md:text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white via-indigo-200 to-slate-400 relative z-10 italic tracking-tight">
+              "Accessibility is not a feature. <br className="sm:hidden" /> It’s usability."
+            </h3>
+          </div>
+        </div>
+      </section>
+
+      {/* 7. Call to Action */}
+      <section className="py-32 relative text-center overflow-hidden bg-gradient-to-t from-cyan-950/20 to-transparent">
+        <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-full max-w-3xl h-1 bg-gradient-to-r from-transparent via-cyan-500/80 to-transparent blur-[2px]"></div>
+        
+        <div className="max-w-4xl mx-auto px-6 relative z-10">
+          <h2 className="text-5xl md:text-6xl font-black text-white mb-8 leading-tight tracking-tight">
+            Make Your Web App Accessible — <br className="hidden md:block" />
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-indigo-400">
+              Without Guesswork.
+            </span>
+          </h2>
+          <p className="text-xl text-slate-400 mb-10 max-w-2xl mx-auto font-medium">
+            Join the forward-thinking teams shipping universally flawless interfaces.
           </p>
-          <Link href="/dashboard" className="btn btn-primary btn-lg">
-            Launch Your First Audit
-            <ArrowRight size={18} />
+          <Link
+            href="/register"
+            className="inline-flex mt-4 px-12 py-5 bg-white text-slate-950 hover:bg-slate-200 rounded-xl font-black text-xl transition-all shadow-[0_0_30px_rgba(255,255,255,0.2)] hover:shadow-[0_0_50px_rgba(255,255,255,0.4)] hover:-translate-y-1 items-center gap-3"
+          >
+            Run Your First Scan
+            <ArrowRight size={24} />
           </Link>
         </div>
       </section>
 
-      {/* Footer */}
-      <footer style={{ 
-        padding: '40px 24px', 
-        borderTop: '1px solid var(--border-subtle)',
-        textAlign: 'center',
-        color: 'var(--text-muted)',
-        fontSize: 14
-      }}>
-        <div style={{ display: 'flex', justifyContent: 'center', gap: 24, marginBottom: 16 }}>
-          <Link href="/dashboard" className="nav-link">Dashboard</Link>
-          <Link href="/projects" className="nav-link">Projects</Link>
-          <Link href="/projects/new" className="nav-link">New Scan</Link>
+      {/* Footer minimal */}
+      <footer className="border-t border-white/5 bg-[#060913]">
+        <div className="max-w-7xl mx-auto px-6 py-8 flex flex-col md:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-2">
+            <Accessibility size={20} className="text-slate-500"/>
+            <span className="font-bold text-slate-300">AccessIQ</span>
+          </div>
+          <p className="text-slate-500 text-sm font-medium">
+            © 2026 AccessIQ Sandbox. Built for the modern web.
+          </p>
+          <div className="flex gap-4">
+            <a href="#" className="text-slate-500 hover:text-cyan-400 text-sm font-medium transition-colors">Privacy</a>
+            <a href="#" className="text-slate-500 hover:text-cyan-400 text-sm font-medium transition-colors">Terms</a>
+          </div>
         </div>
-        <p>© 2026 Intellects Accessibility Platform. HackNiche 4.0 Submission.</p>
       </footer>
 
-      <style jsx>{`
-        .glow-top {
-          position: absolute;
-          top: -20%;
-          left: 50%;
-          transform: translateX(-50%);
-          width: 80vw;
-          height: 60vh;
-          background: radial-gradient(circle, rgba(99, 102, 241, 0.1) 0%, transparent 70%);
-          pointer-events: none;
-        }
-        .glow-bottom {
-          position: absolute;
-          bottom: 20%;
-          right: -10%;
-          width: 50vw;
-          height: 50vh;
-          background: radial-gradient(circle, rgba(168, 85, 247, 0.05) 0%, transparent 70%);
-          pointer-events: none;
-        }
-        .glass-badge {
-          display: inline-flex;
-          align-items: center;
-          gap: 8px;
-          padding: 6px 14px;
-          background: rgba(255, 255, 255, 0.03);
-          border: 1px solid rgba(255, 255, 255, 0.1);
-          border-radius: 100px;
-          font-size: 13px;
-          font-weight: 500;
-          color: var(--text-secondary);
-        }
-        .text-accent {
-          color: var(--accent-primary);
-        }
-        .btn-lg {
-          padding: 14px 28px;
-          font-size: 16px;
-        }
-        .nav-link {
-          color: var(--text-muted);
-          text-decoration: none;
-          transition: color 0.2s;
-        }
-        .nav-link:hover {
-          color: var(--text-primary);
-        }
-      `}</style>
-    </div>
-  );
-}
+      {isDemoOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/75 backdrop-blur-sm px-4">
+          <div className="w-full max-w-4xl rounded-2xl border border-white/10 bg-[#0B1222] shadow-2xl shadow-cyan-900/30 overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-white/10 bg-[#111a2f]">
+              <h3 className="text-white font-bold text-lg">Demo Analysis Preview</h3>
+              <button
+                type="button"
+                onClick={() => setIsDemoOpen(false)}
+                className="p-2 rounded-md text-slate-300 hover:text-white hover:bg-white/10 transition-colors"
+                aria-label="Close demo video"
+              >
+                <X size={18} />
+              </button>
+            </div>
 
-function FeatureCard({ icon, title, description }: { icon: React.ReactNode, title: string, description: string }) {
-  return (
-    <div className="glass-card" style={{ padding: 32, textAlign: 'left', height: '100%', display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <div style={{ 
-        width: 48, 
-        height: 48, 
-        borderRadius: 12, 
-        background: 'rgba(99, 102, 241, 0.1)', 
-        display: 'flex', 
-        alignItems: 'center', 
-        justifyContent: 'center',
-        marginBottom: 8
-      }}>
-        {icon}
-      </div>
-      <div>
-        <h3 style={{ fontSize: 20, fontWeight: 600, marginBottom: 12 }}>{title}</h3>
-        <p style={{ color: 'var(--text-secondary)', lineHeight: 1.6, fontSize: 15 }}>{description}</p>
-      </div>
+            <div className="bg-black">
+              <video
+                controls
+                autoPlay
+                className="w-full h-auto max-h-[75vh]"
+                src="/api/demo-video"
+              >
+                Your browser does not support the video tag.
+              </video>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            aria-label="Close video preview"
+            onClick={() => setIsDemoOpen(false)}
+            className="absolute inset-0 -z-10"
+          />
+        </div>
+      )}
     </div>
   );
 }
