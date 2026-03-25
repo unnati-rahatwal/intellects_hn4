@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Inter, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import Sidebar from "@/components/sidebar";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -15,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "A11y Audit — Web Accessibility Platform",
+  title: "AccessIQ — Build a More Inclusive Web",
   description: "Enterprise-grade web accessibility audit platform with AI-powered remediation. Scan, visualize, and fix WCAG violations across your entire website.",
 };
 
@@ -26,13 +25,8 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={`${inter.variable} ${geistMono.variable}`}>
-      <body>
-        <div className="app-layout">
-          <Sidebar />
-          <main className="main-content">
-            {children}
-          </main>
-        </div>
+      <body className="antialiased">
+        {children}
       </body>
     </html>
   );
