@@ -2,8 +2,9 @@
 
 import { useEffect, useState, use } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, ScanSearch, Trash2, Clock, CheckCircle, AlertTriangle, ArrowRight, Globe } from 'lucide-react';
+import { ArrowLeft, ScanSearch, Trash2, Clock, CheckCircle, AlertTriangle, ArrowRight, Globe, GitCompare } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts';
 
 interface Project {
   _id: string;
@@ -34,6 +35,15 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   const [scans, setScans] = useState<Scan[]>([]);
   const [loading, setLoading] = useState(true);
   const [scanning, setScanning] = useState(false);
+  const [selectedScans, setSelectedScans] = useState<string[]>([]);
+
+  const toggleScanSelection = (scanId: string) => {
+    setSelectedScans(prev => {
+      if (prev.includes(scanId)) return prev.filter(id => id !== scanId);
+      if (prev.length >= 2) return [prev[1], scanId]; // Keep max 2
+      return [...prev, scanId];
+    });
+  };
 
   useEffect(() => {
     // Auth Guard
@@ -152,10 +162,46 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
         </div>
       </div>
 
-      {/* Scans */}
-      <h2 style={{ fontSize: 18, fontWeight: 600, marginBottom: 16 }}>
-        Scan History <span style={{ fontSize: 13, color: 'var(--text-muted)', fontWeight: 400 }}>({scans.length} scans)</span>
-      </h2>
+      {/* Scans Header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+        <h2 style={{ fontSize: 18, fontWeight: 600 }}>
+          Scan History <span style={{ fontSize: 13, color: 'var(--text-muted)', fontWeight: 400 }}>({scans.length} scans)</span>
+        </h2>
+        {scans.length >= 2 && (
+          <Link 
+            href={selectedScans.length === 2 ? `/projects/${id}/compare?scanA=${selectedScans[0]}&scanB=${selectedScans[1]}` : '#'}
+            className={`btn btn-primary ${selectedScans.length !== 2 ? 'opacity-50 cursor-not-allowed' : ''}`}
+            onClick={(e) => selectedScans.length !== 2 && e.preventDefault()}
+          >
+            <GitCompare size={16} /> Compare Selected ({selectedScans.length}/2)
+          </Link>
+        )}
+      </div>
+
+      {scans.length > 0 && (
+        <div className="glass-card bg-slate-900 border border-slate-800 rounded-2xl p-6 mb-8 mt-4">
+          <h3 className="text-sm font-semibold text-slate-300 mb-4 flex items-center gap-2">
+            <ActivityIcon /> Accessibility Score Trend
+          </h3>
+          <div className="h-64 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={[...scans].filter(s => s.status === 'COMPLETED').reverse().map(s => ({
+                date: new Date(s.createdAt).toLocaleDateString(),
+                score: s.accessibilityScore
+              }))}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                <XAxis dataKey="date" stroke="#94a3b8" fontSize={12} />
+                <YAxis stroke="#94a3b8" fontSize={12} domain={[0, 100]} />
+                <RechartsTooltip 
+                  contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #1e293b', borderRadius: '8px' }}
+                  itemStyle={{ color: '#06b6d4', fontWeight: 'bold' }}
+                />
+                <Line type="monotone" dataKey="score" stroke="#06b6d4" strokeWidth={3} dot={{ r: 4, fill: '#06b6d4' }} activeDot={{ r: 6 }} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      )}
 
       {scans.length === 0 ? (
         <div className="glass-card-static empty-state">
@@ -171,6 +217,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
           <table>
             <thead>
               <tr>
+                <th style={{ width: 40 }}></th>
                 <th>Status</th>
                 <th>Score</th>
                 <th>Critical</th>
@@ -184,7 +231,18 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
             </thead>
             <tbody>
               {scans.map((scan) => (
-                <tr key={scan._id}>
+                <tr key={scan._id} className={selectedScans.includes(scan._id) ? 'bg-cyan-900/20' : ''}>
+                  <td>
+                    {scan.status === 'COMPLETED' && (
+                      <input 
+                        type="checkbox" 
+                        checked={selectedScans.includes(scan._id)}
+                        onChange={() => toggleScanSelection(scan._id)}
+                        className="w-4 h-4 rounded border-slate-600 bg-slate-800 focus:ring-cyan-500 text-cyan-500"
+                        title="Select for comparison"
+                      />
+                    )}
+                  </td>
                   <td>
                     <span className={`badge badge-${scan.status === 'COMPLETED' ? 'success' : scan.status === 'FAILED' ? 'critical' : scan.status === 'PROCESSING' ? 'moderate' : 'pending'}`}>
                       {scan.status === 'COMPLETED' ? <CheckCircle size={12} /> : scan.status === 'PROCESSING' ? <Clock size={12} /> : scan.status === 'FAILED' ? <AlertTriangle size={12} /> : null}
@@ -219,6 +277,15 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
         </div>
       )}
     </div>
+  );
+}
+
+// Helper icon component since it wasn't imported
+function ActivityIcon() {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-cyan-500">
+      <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+    </svg>
   );
 }
 
