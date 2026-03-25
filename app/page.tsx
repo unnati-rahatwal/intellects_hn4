@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import {
   ArrowRight,
   Search,
@@ -13,9 +14,12 @@ import {
   Accessibility,
   Zap,
   Layout,
+  X,
 } from "lucide-react";
 
 export default function Home() {
+  const [isDemoOpen, setIsDemoOpen] = useState(false);
+
   return (
     <div className="min-h-screen bg-[#0A0F1C] text-slate-300 font-sans selection:bg-cyan-900 selection:text-cyan-50">
       {/* Floating Badge */}
@@ -90,13 +94,14 @@ export default function Home() {
                 className="group-hover:translate-x-1 transition-transform"
               />
             </Link>
-            <Link
-              href="#demo"
+            <button
+              type="button"
+              onClick={() => setIsDemoOpen(true)}
               className="px-8 py-4 bg-white/5 hover:bg-white/10 border border-white/10 text-white rounded-lg font-bold text-lg transition-all flex items-center gap-2 hover:shadow-[0_0_15px_rgba(255,255,255,0.1)]"
             >
               <Eye size={20} className="text-slate-400 group-hover:text-white" />
               View Demo Analysis
-            </Link>
+            </button>
           </div>
         </div>
       </section>
@@ -485,6 +490,42 @@ export default function Home() {
           </div>
         </div>
       </footer>
+
+      {isDemoOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/75 backdrop-blur-sm px-4">
+          <div className="w-full max-w-4xl rounded-2xl border border-white/10 bg-[#0B1222] shadow-2xl shadow-cyan-900/30 overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-white/10 bg-[#111a2f]">
+              <h3 className="text-white font-bold text-lg">Demo Analysis Preview</h3>
+              <button
+                type="button"
+                onClick={() => setIsDemoOpen(false)}
+                className="p-2 rounded-md text-slate-300 hover:text-white hover:bg-white/10 transition-colors"
+                aria-label="Close demo video"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="bg-black">
+              <video
+                controls
+                autoPlay
+                className="w-full h-auto max-h-[75vh]"
+                src="/api/demo-video"
+              >
+                Your browser does not support the video tag.
+              </video>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            aria-label="Close video preview"
+            onClick={() => setIsDemoOpen(false)}
+            className="absolute inset-0 -z-10"
+          />
+        </div>
+      )}
     </div>
   );
 }
