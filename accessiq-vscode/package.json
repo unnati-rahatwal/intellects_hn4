@@ -23,7 +23,21 @@
         "command": "accessiq.importReport",
         "title": "AccessIQ: Import Remediation Report"
       }
-    ]
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "accessiq.importReport",
+          "group": "navigation"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "accessiq.importReport",
+          "group": "navigation"
+        }
+      ]
+    }
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",

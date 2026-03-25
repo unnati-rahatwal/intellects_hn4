@@ -5,14 +5,18 @@ exports.deactivate = deactivate;
 const vscode = require("vscode");
 const fs = require("fs");
 function activate(context) {
-    const disposable = vscode.commands.registerCommand('accessiq.importReport', async () => {
-        // 1. Ask user to select the Target Code File to fix
-        const codeFileUri = await vscode.window.showOpenDialog({
-            canSelectMany: false,
-            openLabel: 'Select File to Fix (HTML/TSX/etc)'
-        });
-        if (!codeFileUri || codeFileUri.length === 0) {
-            return;
+    const disposable = vscode.commands.registerCommand('accessiq.importReport', async (contextUri) => {
+        // 1. Determine Target Code File
+        let codeFileUri = contextUri;
+        // If command wasn't triggered via context menu (e.g. Command Palette), fallback to active editor
+        if (!codeFileUri) {
+            if (vscode.window.activeTextEditor) {
+                codeFileUri = vscode.window.activeTextEditor.document.uri;
+            }
+            else {
+                vscode.window.showErrorMessage('No file targeted. Please Right-Click an open file or select one in the Explorer first.');
+                return;
+            }
         }
         // 2. Ask user to select the JSON report file
         const fileUri = await vscode.window.showOpenDialog({
@@ -55,7 +59,7 @@ function activate(context) {
                 return;
             }
             const v = selected.violation;
-            await applyFix(v, codeFileUri[0]);
+            await applyFix(v, codeFileUri);
         }
         catch (err) {
             vscode.window.showErrorMessage(`Failed to process report: ${err instanceof Error ? err.message : String(err)}`);
