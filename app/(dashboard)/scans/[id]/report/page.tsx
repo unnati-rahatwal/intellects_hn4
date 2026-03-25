@@ -300,6 +300,7 @@ export default function DetailedReportPage({ params }: { params: Promise<{ id: s
   const [videoGenerating, setVideoGenerating] = useState(false);
   const [videoStatus, setVideoStatus] = useState<'PENDING' | 'GENERATING' | 'COMPLETED' | 'FAILED' | null>(null);
   const [previewImage, setPreviewImage] = useState<{ url: string; title: string } | null>(null);
+  const [isSummaryExpanded, setIsSummaryExpanded] = useState(false);
 
   useEffect(() => {
     async function fetchReport() {
@@ -454,6 +455,23 @@ export default function DetailedReportPage({ params }: { params: Promise<{ id: s
       secScore = Math.round(validPages.reduce((acc, p) => acc + p.securityHeaders.score, 0) / validPages.length);
     }
   }
+
+  const fullExecutiveSummary = scan.aiSummary?.executiveSummary || '';
+  const summaryPreviewLimit = 160;
+  const executiveSummaryPreview =
+    fullExecutiveSummary.length > summaryPreviewLimit
+      ? `${fullExecutiveSummary.slice(0, summaryPreviewLimit).trimEnd()}...`
+      : fullExecutiveSummary;
+  const visibleKeyFindings = isSummaryExpanded
+    ? scan.aiSummary?.keyFindings || []
+    : (scan.aiSummary?.keyFindings || []).slice(0, 1);
+  const visibleRecommendations = isSummaryExpanded
+    ? scan.aiSummary?.recommendations || []
+    : (scan.aiSummary?.recommendations || []).slice(0, 1);
+  const showSummaryReadMore =
+    fullExecutiveSummary.length > summaryPreviewLimit ||
+    (scan.aiSummary?.keyFindings?.length || 0) > 1 ||
+    (scan.aiSummary?.recommendations?.length || 0) > 1;
 
   return (
     <div id="report-content" className="max-w-7xl mx-auto space-y-8 pb-20 animate-fade-in relative">
@@ -645,7 +663,7 @@ export default function DetailedReportPage({ params }: { params: Promise<{ id: s
             {scan.aiSummary?.executiveSummary ? (
               <div className="space-y-6">
                 <p className="text-slate-300 leading-relaxed text-lg">
-                  {scan.aiSummary.executiveSummary}
+                  {isSummaryExpanded ? fullExecutiveSummary : executiveSummaryPreview}
                 </p>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
@@ -654,7 +672,7 @@ export default function DetailedReportPage({ params }: { params: Promise<{ id: s
                       <AlertTriangle className="w-4 h-4 text-amber-500" /> Key Findings
                     </h3>
                     <ul className="space-y-3">
-                      {scan.aiSummary.keyFindings.map((finding: string, i: number) => (
+                      {visibleKeyFindings.map((finding: string, i: number) => (
                         <li key={i} className="flex gap-3 text-sm text-slate-300 bg-slate-800/50 p-3 rounded-lg">
                           <span className="text-amber-500 font-bold">•</span>
                           {finding}
@@ -667,7 +685,7 @@ export default function DetailedReportPage({ params }: { params: Promise<{ id: s
                       <CheckCircle className="w-4 h-4 text-green-500" /> Recommendations
                     </h3>
                     <ul className="space-y-3">
-                      {scan.aiSummary.recommendations.map((rec: string, i: number) => (
+                      {visibleRecommendations.map((rec: string, i: number) => (
                         <li key={i} className="flex gap-3 text-sm text-slate-300 bg-slate-800/50 p-3 rounded-lg">
                           <span className="text-green-500 font-bold">{i + 1}.</span>
                           {rec}
@@ -676,6 +694,18 @@ export default function DetailedReportPage({ params }: { params: Promise<{ id: s
                     </ul>
                   </div>
                 </div>
+
+                {showSummaryReadMore && (
+                  <div className="pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setIsSummaryExpanded((prev) => !prev)}
+                      className="text-sm font-medium text-cyan-400 hover:text-cyan-300 transition-colors"
+                    >
+                      {isSummaryExpanded ? 'Show less' : 'Read more'}
+                    </button>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="flex flex-col items-center justify-center py-12 text-slate-500">
