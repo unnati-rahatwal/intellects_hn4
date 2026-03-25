@@ -22,6 +22,9 @@ export interface IPage extends Document {
   screenshotPath?: string;
   securityHeaders: ISecurityHeaders | null;
   loadTimeMs: number;
+  performanceMetrics: Record<string, unknown> | null;
+  browserIssues: unknown[];
+  accessibilityTreeSnapshot: unknown | null;
   createdAt: Date;
 }
 
@@ -47,6 +50,18 @@ const pageSchema = new Schema<IPage>(
       default: null,
     },
     loadTimeMs: { type: Number, default: 0 },
+    performanceMetrics: {
+      type: Schema.Types.Mixed,
+      default: null,
+    },
+    browserIssues: {
+      type: Schema.Types.Mixed,
+      default: [],
+    },
+    accessibilityTreeSnapshot: {
+      type: Schema.Types.Mixed,
+      default: null,
+    },
   },
   { timestamps: true }
 );

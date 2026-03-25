@@ -6,7 +6,12 @@ import { Violation } from '@/lib/models/violation';
 import { Page } from '@/lib/models/page';
 import { discoverRoutes } from './route-discovery';
 import { analyzeSecurityHeaders } from './security';
-import { captureVisionDeficiencyScreenshots } from './cdp-utils';
+import {
+  captureVisionDeficiencyScreenshots,
+  getAccessibilityTree,
+  getBrowserAuditIssues,
+  getPerformanceMetrics
+} from './cdp-utils';
 
 export interface ScanOptions {
   discoverRoutes: boolean;
@@ -94,9 +99,15 @@ export async function runScan(
     let pagesScanned = 0;
     let totalScore = 0;
 
+    const scanPerformanceAggregate: Record<string, number[]> = {
+      fcp: [],
+      taskDuration: [],
+      loadTime: []
+    };
+
     // Scan each URL
     await logProgress(scanId, `Starting accessibility audit for ${allUrls.length} pages...`);
-    
+
     for (const url of allUrls) {
       await logProgress(scanId, `Analyzing page: ${new URL(url).pathname || '/'}...`);
       const context: BrowserContext = await browser.newContext({
@@ -125,6 +136,27 @@ export async function runScan(
         if (options.securityAudit && response) {
           securityHeaders = analyzeSecurityHeaders(response.headers());
         }
+
+        // Parallel CDP Data Collection
+        const [axTree, browserIssues, rawPerfMetrics] = await Promise.all([
+          getAccessibilityTree(page),
+          getBrowserAuditIssues(page),
+          getPerformanceMetrics(page)
+        ]);
+
+        const fcp = rawPerfMetrics['FirstContentfulPaint'] || 0;
+        const taskDuration = rawPerfMetrics['TaskDuration'] || 0;
+
+        if (fcp > 0) scanPerformanceAggregate.fcp.push(fcp);
+        if (taskDuration > 0) scanPerformanceAggregate.taskDuration.push(taskDuration);
+        scanPerformanceAggregate.loadTime.push(loadTimeMs);
+
+        const performanceMetrics = {
+          ...rawPerfMetrics,
+          loadTimeMs,
+          fcp,
+          taskDuration
+        };
 
         // Run axe-core accessibility audit
         const axeConfig: Record<string, unknown> = {};
@@ -219,7 +251,7 @@ export async function runScan(
         // Vision deficiency screenshots
         if (options.visionEmulation && violations.length > 0) {
           try {
-            await captureVisionDeficiencyScreenshots(page, violations.slice(0, 3) as any);
+            await captureVisionDeficiencyScreenshots(page, violations.slice(0, 3) as unknown as import('./cdp-utils').AxeViolation[]);
           } catch {
             // Non-critical, continue
           }
@@ -232,6 +264,9 @@ export async function runScan(
           screenshotPath,
           securityHeaders,
           loadTimeMs,
+          performanceMetrics,
+          browserIssues,
+          accessibilityTreeSnapshot: axTree
         });
 
         pagesScanned++;
@@ -249,6 +284,13 @@ export async function runScan(
     // Finalize scan
     const avgScore = pagesScanned > 0 ? Math.round(totalScore / pagesScanned) : 0;
 
+    const avg = (arr: number[]) => arr.length > 0 ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
+    const performanceSummary = {
+      avgLoadTime: avg(scanPerformanceAggregate.loadTime),
+      avgFcp: avg(scanPerformanceAggregate.fcp),
+      avgTaskDuration: avg(scanPerformanceAggregate.taskDuration)
+    };
+
     await Scan.findByIdAndUpdate(scanId, {
       status: 'COMPLETED',
       accessibilityScore: avgScore,
@@ -259,6 +301,7 @@ export async function runScan(
       minorIssues: minorCount,
       pagesScanned,
       completedAt: new Date(),
+      performanceSummary,
     });
 
     await logProgress(scanId, `Accessibility audit completed. Found ${totalViolations} issues across ${pagesScanned} pages.`, 'SUCCESS');

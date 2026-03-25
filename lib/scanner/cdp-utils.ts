@@ -1,6 +1,6 @@
 import { Page as PlaywrightPage } from 'playwright';
 
-interface AxeViolation {
+export interface AxeViolation {
   id: string;
   impact?: string;
   nodes: Array<{
@@ -112,3 +112,30 @@ export async function getBrowserAuditIssues(
 
   return issues;
 }
+
+export async function getPerformanceMetrics(
+  page: PlaywrightPage
+): Promise<Record<string, number>> {
+  const cdpSession = await page.context().newCDPSession(page);
+  try {
+    await cdpSession.send('Performance.enable');
+    const { metrics } = await cdpSession.send('Performance.getMetrics');
+    
+    const result: Record<string, number> = {};
+    for (const metric of metrics) {
+      if (
+        ['FirstContentfulPaint', 'DomContentLoaded', 'NavigationStart', 'TaskDuration', 'LayoutCount', 'RecalcStyleCount'].includes(metric.name)
+      ) {
+        result[metric.name] = metric.value;
+      }
+    }
+    return result;
+  } catch (err) {
+    console.error('Failed to get performance metrics:', err);
+    return {};
+  } finally {
+    await cdpSession.send('Performance.disable').catch(() => {});
+    await cdpSession.detach();
+  }
+}
+

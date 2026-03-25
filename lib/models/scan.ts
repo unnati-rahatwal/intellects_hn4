@@ -32,6 +32,13 @@ export interface IScan extends Document {
   completedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
+  performanceSummary: Record<string, unknown> | null;
+  aiSummary: {
+    executiveSummary: string;
+    keyFindings: string[];
+    recommendations: string[];
+    generatedAt: Date | null;
+  } | null;
 }
 
 const scanSchema = new Schema<IScan>(
@@ -74,6 +81,16 @@ const scanSchema = new Schema<IScan>(
     errorMessage: { type: String },
     startedAt: { type: Date },
     completedAt: { type: Date },
+    performanceSummary: {
+      type: Schema.Types.Mixed,
+      default: null,
+    },
+    aiSummary: {
+      executiveSummary: { type: String, default: '' },
+      keyFindings: [{ type: String }],
+      recommendations: [{ type: String }],
+      generatedAt: { type: Date, default: null },
+    },
   },
   { timestamps: true }
 );

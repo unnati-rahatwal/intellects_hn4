@@ -11,7 +11,8 @@ import {
   ArrowRight,
   Loader2,
   Calendar,
-  Globe
+  Globe,
+  FileText
 } from 'lucide-react';
 
 interface ProgressLog {
@@ -176,15 +177,24 @@ export default function ScanDetailPage({ params }: { params: Promise<{ id: strin
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-col sm:flex-row items-center gap-3">
           {scan.status === 'COMPLETED' ? (
-            <button
-              onClick={() => router.push(`/scans/${scan._id}/explore`)}
-              className="flex items-center gap-2 px-6 py-3 bg-cyan-500 hover:bg-cyan-400 text-black font-semibold rounded-xl shadow-lg shadow-cyan-500/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
-            >
-              Visual Explorer
-              <ArrowRight className="w-4 h-4" />
-            </button>
+            <>
+              <button
+                onClick={() => router.push(`/scans/${scan._id}/report`)}
+                className="flex items-center gap-2 px-6 py-3 bg-indigo-500 hover:bg-indigo-400 text-white font-semibold rounded-xl shadow-lg shadow-indigo-500/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
+              >
+                <FileText className="w-4 h-4" />
+                Executive Report
+              </button>
+              <button
+                onClick={() => router.push(`/scans/${scan._id}/explore`)}
+                className="flex items-center gap-2 px-6 py-3 bg-cyan-500 hover:bg-cyan-400 text-black font-semibold rounded-xl shadow-lg shadow-cyan-500/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
+              >
+                Visual Explorer
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            </>
           ) : (
              <div className="flex items-center gap-4 px-5 py-3 bg-white/5 border border-white/10 rounded-2xl">
                <div className="text-right">
