@@ -22,6 +22,33 @@ export interface ScanOptions {
   securityAudit: boolean;
 }
 
+type StageScreenshot = {
+  stage: 'PAGE_LOADED' | 'CDP_CAPTURED' | 'AXE_ANALYZED' | 'VISION_EMULATION' | 'FINAL';
+  imageData: string;
+  capturedAt: Date;
+};
+
+async function captureStageScreenshot(
+  page: PlaywrightPage,
+  stage: StageScreenshot['stage']
+): Promise<StageScreenshot | null> {
+  try {
+    const buffer = await page.screenshot({
+      fullPage: true,
+      type: 'jpeg',
+      quality: 60,
+    });
+
+    return {
+      stage,
+      imageData: `data:image/jpeg;base64,${buffer.toString('base64')}`,
+      capturedAt: new Date(),
+    };
+  } catch {
+    return null;
+  }
+}
+
 async function logProgress(
   scanId: string,
   message: string,
@@ -123,11 +150,15 @@ export async function runScan(
 
       try {
         const startTime = Date.now();
+        const stageScreenshots: StageScreenshot[] = [];
 
         const response = await page.goto(url, {
           waitUntil: 'networkidle',
           timeout: 30000,
         });
+
+        const pageLoadedShot = await captureStageScreenshot(page, 'PAGE_LOADED');
+        if (pageLoadedShot) stageScreenshots.push(pageLoadedShot);
 
         const loadTimeMs = Date.now() - startTime;
 
@@ -143,6 +174,9 @@ export async function runScan(
           getBrowserAuditIssues(page),
           getPerformanceMetrics(page)
         ]);
+
+        const cdpCapturedShot = await captureStageScreenshot(page, 'CDP_CAPTURED');
+        if (cdpCapturedShot) stageScreenshots.push(cdpCapturedShot);
 
         const fcp = rawPerfMetrics['FirstContentfulPaint'] || 0;
         const taskDuration = rawPerfMetrics['TaskDuration'] || 0;
@@ -180,6 +214,9 @@ export async function runScan(
         const results = await axeBuilder.analyze();
         await logProgress(scanId, `Completed accessibility audit for ${new URL(url).pathname || '/'}`, 'SUCCESS');
 
+        const axeAnalyzedShot = await captureStageScreenshot(page, 'AXE_ANALYZED');
+        if (axeAnalyzedShot) stageScreenshots.push(axeAnalyzedShot);
+
         // Take full-page screenshot
         let screenshotPath: string | undefined;
         try {
@@ -201,14 +238,44 @@ export async function runScan(
           for (const node of violation.nodes) {
             // Extract bounding box
             let boundingBox = null;
+            let violationScreenshotPath: string | undefined;
+            let selector = '';
             try {
-              const selector = node.target?.[0];
+              selector = node.target?.[0];
               if (selector && typeof selector === 'string') {
                 const element = page.locator(selector).first();
                 boundingBox = await element.boundingBox();
+
+                try {
+                  const elementShot = await element.screenshot({
+                    type: 'jpeg',
+                    quality: 60,
+                  });
+                  violationScreenshotPath = `data:image/jpeg;base64,${elementShot.toString('base64')}`;
+                } catch {
+                  // Some elements cannot be captured directly; fallback to page clip below.
+                }
               }
             } catch {
               // Bounding box might fail for hidden elements
+            }
+
+            if (!violationScreenshotPath && boundingBox && boundingBox.width > 1 && boundingBox.height > 1) {
+              try {
+                const clipShot = await page.screenshot({
+                  type: 'jpeg',
+                  quality: 60,
+                  clip: {
+                    x: Math.max(0, boundingBox.x),
+                    y: Math.max(0, boundingBox.y),
+                    width: Math.max(1, boundingBox.width),
+                    height: Math.max(1, boundingBox.height),
+                  },
+                });
+                violationScreenshotPath = `data:image/jpeg;base64,${clipShot.toString('base64')}`;
+              } catch {
+                // Non-critical if screenshot capture fails.
+              }
             }
 
             const impact = (violation.impact || 'moderate') as 'minor' | 'moderate' | 'serious' | 'critical';
@@ -223,7 +290,7 @@ export async function runScan(
               htmlSnippet: (node.html || '').slice(0, 5000),
               cssSelector: Array.isArray(node.target) ? node.target.join(' ') : String(node.target),
               boundingBox,
-              screenshotPath: undefined,
+              screenshotPath: violationScreenshotPath,
               wcagCriteria: violation.tags?.filter((t: string) => t.startsWith('wcag')) || [],
               tags: violation.tags || [],
             });
@@ -263,9 +330,19 @@ export async function runScan(
         if (options.visionEmulation && colorContrastDocs.length > 0) {
           try {
             await captureVisionDeficiencyScreenshots(page, colorContrastDocs);
+            const visionShot = await captureStageScreenshot(page, 'VISION_EMULATION');
+            if (visionShot) stageScreenshots.push(visionShot);
           } catch {
             // Non-critical, continue
           }
+        }
+
+        if (screenshotPath) {
+          stageScreenshots.push({
+            stage: 'FINAL',
+            imageData: screenshotPath,
+            capturedAt: new Date(),
+          });
         }
 
         await Page.findByIdAndUpdate(pageDoc._id, {
@@ -273,6 +350,7 @@ export async function runScan(
           violationCount: pageViolationCount,
           accessibilityScore: pageScore,
           screenshotPath,
+          stageScreenshots,
           securityHeaders,
           loadTimeMs,
           performanceMetrics,
