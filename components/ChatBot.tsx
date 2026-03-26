@@ -121,7 +121,7 @@ export default function ChatBot() {
       {!isOpen && (
         <button
           onClick={() => setIsOpen(true)}
-          className="fixed bottom-6 right-6 z-50 p-4 bg-linear-to-br from-orange-500 to-fuchsia-600 rounded-full shadow-lg shadow-orange-900/40 hover:scale-110 hover:shadow-orange-700/50 transition-all duration-300 group"
+          className="fixed bottom-6 right-6 z-50 p-4 bg-linear-to-br from-cyan-500 to-indigo-600 rounded-full shadow-lg shadow-cyan-900/40 hover:scale-110 hover:shadow-cyan-700/50 transition-all duration-300 group"
           aria-label="Open Contextual Chatbot"
         >
           <MessageCircle className="text-white w-6 h-6 group-hover:rotate-12 transition-transform" />
@@ -134,18 +134,18 @@ export default function ChatBot() {
 
       {/* Chat Window */}
       {isOpen && (
-        <div className="fixed bottom-6 right-6 z-50 w-[350px] sm:w-[400px] h-[500px] bg-[#0A1114]/95 backdrop-blur-2xl border border-white/10 shadow-2xl shadow-orange-900/20 rounded-2xl flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-5 duration-300">
+        <div className="fixed bottom-6 right-6 z-50 w-[350px] sm:w-[400px] h-[500px] bg-[#0A1114]/95 backdrop-blur-2xl border border-white/10 shadow-2xl shadow-cyan-900/20 rounded-2xl flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-5 duration-300">
           {/* Header */}
-          <div className="h-16 bg-linear-to-r from-orange-500/20 to-fuchsia-500/20 border-b border-white/10 flex flex-row items-center justify-between px-4 shrink-0 relative overflow-hidden">
-            <div className="absolute top-0 left-0 w-full h-[1px] bg-linear-to-r from-transparent via-orange-400/50 to-transparent" />
+          <div className="h-16 bg-linear-to-r from-cyan-500/20 to-indigo-500/20 border-b border-white/10 flex flex-row items-center justify-between px-4 shrink-0 relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-full h-[1px] bg-linear-to-r from-transparent via-cyan-400/50 to-transparent" />
             <div className="flex items-center gap-3 relative z-10">
-              <div className="bg-orange-500/20 p-2 rounded-xl border border-orange-500/30">
-                <Bot className="w-5 h-5 text-orange-400" />
+              <div className="bg-cyan-500/20 p-2 rounded-xl border border-cyan-500/30">
+                <Bot className="w-5 h-5 text-cyan-400" />
               </div>
               <div>
                 <h3 className="text-white font-semibold text-sm">AccessIQ Assistant</h3>
-                <p className="text-orange-400/80 text-xs flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-orange-500 animate-pulse"></span>
+                <p className="text-cyan-400/80 text-xs flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-cyan-500 animate-pulse"></span>
                   Viewing {getPageContextName()}
                 </p>
               </div>
@@ -171,8 +171,8 @@ export default function ChatBot() {
                 <div
                   className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
                     msg.sender === "user"
-                      ? "bg-fuchsia-500/20 text-fuchsia-300 border border-fuchsia-500/30"
-                      : "bg-[#141C20] text-orange-400 border border-white/10 shadow-inner"
+                      ? "bg-blue-500/20 text-blue-300 border border-blue-500/30"
+                      : "bg-[#141C20] text-cyan-400 border border-white/10 shadow-inner"
                   }`}
                 >
                   {msg.sender === "user" ? <User size={14} /> : <Bot size={14} />}
@@ -180,7 +180,7 @@ export default function ChatBot() {
                 <div
                   className={`p-3 rounded-2xl text-sm leading-relaxed ${
                     msg.sender === "user"
-                      ? "bg-linear-to-br from-fuchsia-600/90 to-purple-600/90 text-white shadow-lg border border-fuchsia-400/20"
+                      ? "bg-linear-to-br from-indigo-600/90 to-indigo-600/90 text-white shadow-lg border border-indigo-400/20"
                       : "bg-white/5 text-zinc-300 border border-white/5"
                   }`}
                 >
@@ -195,7 +195,7 @@ export default function ChatBot() {
           <div className="p-4 border-t border-white/10 bg-[#05090A]/50 shrink-0">
             <form
               onSubmit={handleSend}
-              className="flex items-center gap-2 bg-[#10191D] border border-white/10 rounded-full py-1.5 px-2 focus-within:border-orange-500/50 focus-within:ring-1 focus-within:ring-orange-500/30 transition-all shadow-inner"
+              className="flex items-center gap-2 bg-[#10191D] border border-white/10 rounded-full py-1.5 px-2 focus-within:border-cyan-500/50 focus-within:ring-1 focus-within:ring-cyan-500/30 transition-all shadow-inner"
             >
               <input
                 type="text"
@@ -207,7 +207,7 @@ export default function ChatBot() {
               <button
                 type="submit"
                 disabled={!inputValue.trim()}
-                className="p-2 rounded-full bg-orange-500 text-white hover:bg-orange-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="p-2 rounded-full bg-cyan-500 text-white hover:bg-cyan-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Send className="w-4 h-4 ml-0.5" />
               </button>
