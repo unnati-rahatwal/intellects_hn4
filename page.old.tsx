@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { use, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -28,9 +28,7 @@ import {
   Printer,
   Copy,
   Check,
-  X,
-  Terminal,
-  Cpu
+  X
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, Legend } from 'recharts';
 // @ts-ignore
@@ -78,243 +76,6 @@ const STAGE_LABELS: Record<string, string> = {
   VISION_EMULATION: 'Vision Emulation',
   FINAL: 'Final Snapshot',
 };
-
-function GradCamModal({
-  imageUrl,
-  title,
-  onClose,
-}: {
-  imageUrl: string;
-  title: string;
-  onClose: () => void;
-}) {
-  const [scanProgress, setScanProgress] = useState(0);
-  const [scanPhase, setScanPhase] = useState<'initializing' | 'scanning' | 'analyzing' | 'complete'>('initializing');
-  const [analysisLogs, setAnalysisLogs] = useState<{ time: string; msg: string; type: 'info' | 'warn' | 'error' | 'success' }[]>([]);
-  const [boundingBoxes, setBoundingBoxes] = useState<{ x: number; y: number; width: number; height: number; confidence: number; label: string }[]>([]);
-
-  useEffect(() => {
-    // Prevent background scrolling
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = 'auto';
-    };
-  }, []);
-
-  const addLog = (msg: string, type: 'info' | 'warn' | 'error' | 'success' = 'info') => {
-    setAnalysisLogs(prev => [...prev, { time: new Date().toISOString().split('T')[1].slice(0, 12), msg, type }]);
-  };
-
-  useEffect(() => {
-    let isMounted = true;
-
-    const runVisionAnalysis = async () => {
-      setScanPhase('initializing');
-      addLog('Initializing Vision Model (Qwen2-VL-7B-Instruct)...', 'info');
-      setScanProgress(15);
-      
-      await new Promise(r => setTimeout(r, 800));
-      if (!isMounted) return;
-      
-      setScanPhase('scanning');
-      addLog('Ingesting visual context and structural DOM layout...', 'info');
-      setScanProgress(45);
-
-      try {
-        const res = await fetch('/api/vision', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ imageUrl })
-        });
-        
-        if (!res.ok) throw new Error(`Vision API failed: ${res.statusText}`);
-        
-        const data = await res.json();
-        if (!isMounted) return;
-
-        setScanProgress(80);
-        setScanPhase('analyzing');
-        addLog('Applying structural heuristics & LLM bounding boxes...', 'info');
-
-        if (data.analysisLogs) {
-          data.analysisLogs.forEach((logStr: string) => addLog(logStr, 'warn'));
-        } else if (data.explanation) {
-          addLog(data.explanation.slice(0, 100) + '...', 'warn');
-        }
-
-        if (data.boundingBoxes) {
-          setBoundingBoxes(data.boundingBoxes);
-        }
-
-        await new Promise(r => setTimeout(r, 600));
-        if (!isMounted) return;
-
-        setScanProgress(100);
-        setScanPhase('complete');
-        addLog('Visual analysis complete.', 'success');
-        
-      } catch (err) {
-        if (!isMounted) return;
-        setScanProgress(100);
-        setScanPhase('complete');
-        addLog(err instanceof Error ? err.message : 'Vision analysis failed.', 'error');
-      }
-    };
-
-    runVisionAnalysis();
-    
-    return () => { isMounted = false; };
-  }, [imageUrl]);
-
-  return (
-    <div
-      className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-xl flex items-center justify-center p-4 print:hidden"
-      onClick={onClose}
-    >
-      <div 
-        className="relative w-full max-w-6xl h-[85vh] bg-slate-900 border border-slate-700/50 rounded-2xl overflow-hidden flex flex-col md:flex-row"
-        onClick={e => e.stopPropagation()}
-      >
-        {/* Main Viewport */}
-        <div className="flex-1 relative bg-black flex items-center justify-center border-r border-slate-800">
-          <div className="absolute top-4 left-4 z-10 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-lg border border-slate-700/50">
-            <h3 className="text-white font-medium flex items-center gap-2">
-              <Eye className="w-4 h-4 text-blue-400" />
-              Vision AI Analysis
-            </h3>
-            <p className="text-xs text-slate-400 mt-0.5">{title}</p>
-          </div>
-
-          <div className="relative max-w-full max-h-full inline-block group overflow-hidden">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={imageUrl}
-              alt={title}
-              className={`max-w-full max-h-[85vh] object-contain transition-all duration-1000 ${
-                scanPhase !== 'complete' ? 'grayscale opacity-75 blur-[2px]' : 'grayscale-0 opacity-100 blur-0'
-              }`}
-            />
-
-            {/* AI Heatmap Overlay */}
-            <div 
-              className={`absolute inset-0 mix-blend-screen opacity-60 transition-opacity duration-1000 pointer-events-none ${
-                scanPhase !== 'complete' ? 'opacity-80' : 'opacity-30'
-              }`}
-              style={{
-                background: scanPhase === 'complete' 
-                  ? 'radial-gradient(circle at 50% 50%, rgba(2ef0ff,0.1) 0%, transparent 70%)'
-                  : 'repeating-linear-gradient(0deg, rgba(2ef0ff,0.05) 0px, rgba(2ef0ff,0.05) 1px, transparent 1px, transparent 4px)',
-                backgroundSize: '100% 4px'
-              }}
-            />
-
-            {/* Bounding Boxes */}
-            {scanPhase === 'complete' && boundingBoxes.length > 0 && boundingBoxes.map((box, i) => (
-              <div 
-                key={i}
-                className="absolute border-2 border-red-500 bg-red-500/10 shadow-[0_0_15px_rgba(239,68,68,0.5)] transition-all animate-pulse-slow"
-                style={{
-                  left: `${Math.max(0, Math.min(100, box.x))}%`,
-                  top: `${Math.max(0, Math.min(100, box.y))}%`,
-                  width: `${Math.max(1, Math.min(100, box.width))}%`,
-                  height: `${Math.max(1, Math.min(100, box.height))}%`,
-                }}
-              >
-                <span className="absolute -top-6 left-0 bg-red-600 text-white text-[10px] font-mono px-1.5 py-0.5 rounded-sm whitespace-nowrap shadow-md">
-                  {box.label} [{(box.confidence * 100).toFixed(0)}%]
-                </span>
-              </div>
-            ))}
-
-            {/* Scanning Laser */}
-            {scanPhase !== 'complete' && (
-              <div 
-                className="absolute left-0 right-0 h-1 bg-cyan-400 shadow-[0_0_20px_4px_rgba(34,211,238,0.7)] z-20"
-                style={{
-                  top: `${scanProgress}%`,
-                  transition: 'top 0.8s ease-out'
-                }}
-              />
-            )}
-            
-            {/* Viewfinder Corners */}
-            <div className="absolute top-0 left-0 w-8 h-8 border-t-2 border-l-2 border-cyan-500/50" />
-            <div className="absolute top-0 right-0 w-8 h-8 border-t-2 border-r-2 border-cyan-500/50" />
-            <div className="absolute bottom-0 left-0 w-8 h-8 border-b-2 border-l-2 border-cyan-500/50" />
-            <div className="absolute bottom-0 right-0 w-8 h-8 border-b-2 border-r-2 border-cyan-500/50" />
-          </div>
-        </div>
-
-        {/* Neural Diagnostics Sidebar */}
-        <div className="w-full md:w-80 bg-slate-900 flex flex-col border-l border-slate-800">
-          <div className="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-800/20">
-            <div className="flex items-center gap-2">
-              <Cpu className="w-4 h-4 text-slate-400" />
-              <h3 className="text-sm font-semibold text-slate-300">Neural Diagnostics</h3>
-            </div>
-            <button 
-              onClick={onClose}
-              className="p-1.5 hover:bg-slate-700/50 rounded-lg transition-colors text-slate-400 hover:text-white"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-
-          <div className="p-4 space-y-4">
-            <div>
-              <div className="flex justify-between text-xs mb-1.5">
-                <span className="text-slate-400 uppercase tracking-wider font-semibold">Vision Model Status</span>
-                <span className="text-cyan-400 font-mono">{scanProgress}%</span>
-              </div>
-              <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
-                <div 
-                  className="h-full bg-cyan-500 rounded-full shadow-[0_0_10px_rgba(6,182,212,0.5)] transition-all duration-500"
-                  style={{ width: `${scanProgress}%` }}
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2 text-xs font-mono">
-              <div className="bg-slate-800/40 p-2 rounded border border-slate-700/50">
-                <span className="text-slate-500 block mb-1">Arch</span>
-                <span className="text-slate-300">QWen2-VL</span>
-              </div>
-              <div className="bg-slate-800/40 p-2 rounded border border-slate-700/50">
-                <span className="text-slate-500 block mb-1">Params</span>
-                <span className="text-slate-300">7B</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex-1 bg-black/40 border-t border-slate-800 flex flex-col min-h-0">
-            <div className="px-4 py-2 border-b border-slate-800/50 bg-slate-800/20 text-xs font-semibold uppercase tracking-wider text-slate-500 flex items-center justify-between">
-              <span>Activity Log</span>
-              <Terminal className="w-3 h-3" />
-            </div>
-            <div className="flex-1 overflow-y-auto p-4 space-y-2 font-mono text-[10px]">
-              {analysisLogs.map((log, i) => (
-                <div key={i} className={`flex gap-3 leading-relaxed ${
-                  log.type === 'error' ? 'text-red-400' :
-                  log.type === 'warn' ? 'text-yellow-400' :
-                  log.type === 'success' ? 'text-green-400' : 'text-slate-400'
-                }`}>
-                  <span className="text-slate-600 shrink-0">[{log.time}]</span>
-                  <span className="break-words">{log.msg}</span>
-                </div>
-              ))}
-              {scanPhase !== 'complete' && (
-                <div className="flex gap-3 text-cyan-500/50 animate-pulse">
-                  <span className="shrink-0">[{new Date().toISOString().split('T')[1].slice(0, 12)}]</span>
-                  <span>_</span>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 function ScoreGauge({ score, label, icon: Icon }: { score: number; label: string; icon: React.ElementType }) {
   const getScoreColor = (s: number) => {
@@ -762,7 +523,7 @@ export default function DetailedReportPage({ params }: { params: Promise<{ id: s
             <h1 className="text-3xl font-bold text-white tracking-tight">Executive Audit Report</h1>
             <p className="text-slate-400 flex items-center gap-2 mt-1">
               <Globe className="w-4 h-4" /> {scan.targetUrls[0]}
-              <span className="text-slate-600">•</span>
+              <span className="text-slate-600">ΓÇó</span>
               <Calendar className="w-4 h-4" /> {new Date(scan.completedAt).toLocaleDateString()}
             </p>
           </div>
@@ -799,7 +560,7 @@ export default function DetailedReportPage({ params }: { params: Promise<{ id: s
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-blue-500/20 flex items-center justify-center">
-                <div className="w-6 h-6 text-blue-400">▶</div>
+                <div className="w-6 h-6 text-blue-400">Γû╢</div>
               </div>
               <div>
                 <h2 className="text-xl font-bold text-white">Executive Video Summary</h2>
@@ -864,9 +625,9 @@ export default function DetailedReportPage({ params }: { params: Promise<{ id: s
                 <p className="text-slate-200 font-medium">Generating Executive Video...</p>
                 <p className="text-xs text-slate-500 mt-1">This may take 30-120 seconds</p>
                 <div className="text-xs text-slate-400 mt-2 space-y-1">
-                  <p>→ Script generation in progress...</p>
-                  <p>→ Audio synthesis in progress...</p>
-                  <p>→ Avatar video creation in progress...</p>
+                  <p>ΓåÆ Script generation in progress...</p>
+                  <p>ΓåÆ Audio synthesis in progress...</p>
+                  <p>ΓåÆ Avatar video creation in progress...</p>
                 </div>
               </div>
             </div>
@@ -887,7 +648,7 @@ export default function DetailedReportPage({ params }: { params: Promise<{ id: s
           ) : (
             <div className="flex flex-col items-center justify-center py-12 gap-4">
               <div className="w-12 h-12 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-400">
-                ▶
+                Γû╢
               </div>
               <div className="text-center">
                 <p className="text-slate-200 font-medium">No Video Generated Yet</p>
@@ -902,7 +663,7 @@ export default function DetailedReportPage({ params }: { params: Promise<{ id: s
               </button>
               {!scan.aiSummary?.executiveSummary && (
                 <p className="text-xs text-amber-400 text-center mt-2">
-                  ✓ Waiting for AI summary to complete before video generation
+                  Γ£ô Waiting for AI summary to complete before video generation
                 </p>
               )}
             </div>
@@ -940,7 +701,7 @@ export default function DetailedReportPage({ params }: { params: Promise<{ id: s
                     <ul className="space-y-3">
                       {visibleKeyFindings.map((finding: string, i: number) => (
                         <li key={i} className="flex gap-3 text-sm text-slate-300 bg-slate-800/50 p-3 rounded-lg">
-                          <span className="text-amber-500 font-bold">•</span>
+                          <span className="text-amber-500 font-bold">ΓÇó</span>
                           {finding}
                         </li>
                       ))}
@@ -1183,7 +944,7 @@ export default function DetailedReportPage({ params }: { params: Promise<{ id: s
         ) : (
           <div className="text-center py-8 text-slate-500">
             <Network className="w-10 h-10 mx-auto mb-3 opacity-30" />
-            <p>No browser-level issues detected — great!</p>
+            <p>No browser-level issues detected ΓÇö great!</p>
           </div>
         )}
       </div>
@@ -1381,11 +1142,11 @@ export default function DetailedReportPage({ params }: { params: Promise<{ id: s
                       <Layers className="w-6 h-6 text-cyan-500" /> Page-Level Violation Analytics
                     </h2>
                     <p className="text-sm text-slate-400 mt-1">
-                      Interactive stacked chart — click any colored segment to see issues.
+                      Interactive stacked chart ΓÇö click any colored segment to see issues.
                     </p>
                   </div>
                   <div className="text-sm border border-slate-700 bg-slate-800 px-3 py-1.5 rounded-lg text-slate-400 font-medium">
-                    {violations.length} total issues · {barData.length} pages
+                    {violations.length} total issues ┬╖ {barData.length} pages
                   </div>
                 </div>
                 {barData.length > 0 ? (
@@ -1468,7 +1229,7 @@ export default function DetailedReportPage({ params }: { params: Promise<{ id: s
                       style={{ backgroundColor: SEVERITY_BG[drillImpact], color: SEVERITY_COLORS[drillImpact] }}
                     >
                       <span className="w-2 h-2 rounded-full" style={{ backgroundColor: SEVERITY_COLORS[drillImpact] }} />
-                      {drillImpact} · {drillViolations.length} issues
+                      {drillImpact} ┬╖ {drillViolations.length} issues
                     </span>
                   </div>
                   <p className="text-xs text-slate-500 mt-1 font-mono truncate">{drillUrl}</p>
@@ -1542,11 +1303,33 @@ export default function DetailedReportPage({ params }: { params: Promise<{ id: s
       </div>
 
       {previewImage && typeof window !== 'undefined' && createPortal(
-        <GradCamModal
-          imageUrl={previewImage.url}
-          title={previewImage.title}
-          onClose={() => setPreviewImage(null)}
-        />,
+        <div
+          className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 print:hidden"
+          onClick={() => setPreviewImage(null)}
+        >
+          <div
+            className="relative w-full max-w-6xl h-[92vh] border border-slate-700 rounded-xl bg-slate-950/95 overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800 bg-slate-900/80">
+              <p className="text-sm text-slate-200 truncate pr-4">{previewImage?.title}</p>
+              <button
+                type="button"
+                onClick={() => setPreviewImage(null)}
+                className="p-1.5 rounded-md hover:bg-slate-800 text-slate-300 hover:text-white transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="w-full h-[calc(92vh-52px)] flex items-center justify-center bg-black/80 overflow-hidden">
+              <img
+                src={previewImage?.url}
+                alt={previewImage?.title}
+                className="max-w-full max-h-full object-contain"
+              />
+            </div>
+          </div>
+        </div>,
         document.body
       )}
     </div>
