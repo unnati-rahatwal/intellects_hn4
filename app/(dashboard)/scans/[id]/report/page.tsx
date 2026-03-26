@@ -28,7 +28,20 @@ import {
   Printer,
   X
 } from 'lucide-react';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, Legend } from 'recharts';
+import {
+  PieChart,
+  Pie,
+  Cell,
+  ResponsiveContainer,
+  Tooltip as RechartsTooltip,
+  Legend,
+  ComposedChart,
+  CartesianGrid,
+  XAxis,
+  YAxis,
+  Bar,
+  Line,
+} from 'recharts';
 // @ts-ignore
 import ReactDiffViewer from 'react-diff-viewer-continued';
 
@@ -961,6 +974,46 @@ export default function DetailedReportPage({ params }: { params: Promise<{ id: s
                   }
                 }
 
+                const scoreAfterViolations = Math.max(0, 100 - violationPenalty);
+                const scoreAfterFcp = Math.max(0, scoreAfterViolations - fcpPenalty);
+                const scoreAfterLoad = Math.max(0, scoreAfterFcp - loadPenalty);
+                const scoreAfterOther = Math.max(0, scoreAfterLoad - otherPenalty);
+
+                const timelineBase = [
+                  { step: 'Start', timeMs: 0, score: 100, order: 0 },
+                  { step: 'Viol.', timeMs: 0, score: scoreAfterViolations, order: 1 },
+                  ...(fcpMs > 0 || fcpPenalty > 0
+                    ? [{ step: 'FCP', timeMs: Math.max(0, fcpMs), score: scoreAfterFcp, order: 2 }]
+                    : []),
+                  ...(loadTimeMs > 0 || loadPenalty > 0
+                    ? [{ step: 'Load', timeMs: Math.max(0, loadTimeMs), score: scoreAfterLoad, order: 3 }]
+                    : []),
+                  ...(otherPenalty > 0
+                    ? [
+                        {
+                          step: 'Other',
+                          timeMs: Math.max(loadTimeMs, fcpMs, 1),
+                          score: scoreAfterOther,
+                          order: 4,
+                        },
+                      ]
+                    : []),
+                  { step: 'Final', timeMs: Math.max(loadTimeMs, fcpMs, 1), score: shownScore, order: 5 },
+                ];
+
+                const scoreTimeline = timelineBase
+                  .sort((a, b) => (a.timeMs === b.timeMs ? a.order - b.order : a.timeMs - b.timeMs))
+                  .map((point) => ({
+                    ...point,
+                    scoreBar: point.score,
+                    scoreLine: point.score,
+                    timeTick: `${point.timeMs}ms`,
+                    label: `${point.step} (${point.timeMs}ms)`,
+                  }));
+
+                const minScoreInChart = scoreTimeline.reduce((min, pnt) => Math.min(min, pnt.score), 100);
+                const chartYMin = Math.max(0, Math.floor(minScoreInChart - 2));
+
                 return (
                   <>
               <div className="flex items-center justify-between">
@@ -983,49 +1036,96 @@ export default function DetailedReportPage({ params }: { params: Promise<{ id: s
               {(violations > 0 || loadTimeMs > 0 || fcpMs > 0 || displayedPenalty > 0) && (
                 <div className="mt-3 rounded-lg border border-slate-700/60 bg-slate-900/50 p-3">
                   <p className="text-[11px] uppercase tracking-wider text-slate-500 mb-2">Why this score (factor breakdown)</p>
-                  <div className="space-y-2 text-xs text-slate-300">
-                    {violations > 0 && (
-                      <div>
-                        <p className="font-medium mb-1">
-                          {violations} violation{violations !== 1 ? 's' : ''} across {uniqueRuleIds.length} issue type{uniqueRuleIds.length !== 1 ? 's' : ''}:
-                        </p>
-                        <div className="ml-2 space-y-1 text-slate-400 border-l border-slate-600 pl-2">
-                          {uniqueRuleIds.slice(0, 3).map((ruleId) => (
-                            <p key={ruleId}>
-                              • {RULE_DESCRIPTIONS[ruleId]?.name || ruleId}
-                            </p>
-                          ))}
-                          {uniqueRuleIds.length > 3 && (
-                            <p>• +{uniqueRuleIds.length - 3} more issue type{uniqueRuleIds.length - 3 !== 1 ? 's' : ''}</p>
-                          )}
+                  <div className="grid grid-cols-1 xl:grid-cols-12 gap-4">
+                    <div className="space-y-2 text-xs text-slate-300 xl:col-span-7">
+                      {violations > 0 && (
+                        <div>
+                          <p className="font-medium mb-1">
+                            {violations} violation{violations !== 1 ? 's' : ''} across {uniqueRuleIds.length} issue type{uniqueRuleIds.length !== 1 ? 's' : ''}:
+                          </p>
+                          <div className="ml-2 space-y-1 text-slate-400 border-l border-slate-600 pl-2">
+                            {uniqueRuleIds.slice(0, 3).map((ruleId) => (
+                              <p key={ruleId}>
+                                • {RULE_DESCRIPTIONS[ruleId]?.name || ruleId}
+                              </p>
+                            ))}
+                            {uniqueRuleIds.length > 3 && (
+                              <p>• +{uniqueRuleIds.length - 3} more issue type{uniqueRuleIds.length - 3 !== 1 ? 's' : ''}</p>
+                            )}
+                          </div>
+                          <p className="mt-1">Penalty: <span className="text-rose-300">-{violationPenalty}</span></p>
                         </div>
-                        <p className="mt-1">Penalty: <span className="text-rose-300">-{violationPenalty}</span></p>
+                      )}
+
+                      {loadPenalty > 0 && (
+                        <p>
+                          Page Load Time ({loadTimeMs}ms) penalty: <span className="text-rose-300">-{loadPenalty}</span>
+                        </p>
+                      )}
+
+                      {fcpMs > 0 && fcpPenalty > 0 && (
+                        <p>
+                          First Contentful Paint ({fcpMs}ms) penalty: <span className="text-rose-300">-{fcpPenalty}</span>
+                        </p>
+                      )}
+
+                      {otherPenalty > 0 && (
+                        <p>
+                          Other quality signals penalty: <span className="text-rose-300">-{otherPenalty}</span>
+                        </p>
+                      )}
+
+                      <p className="pt-2 border-t border-slate-700/60">
+                        Calculation: <span className="text-slate-400">100 - {violationPenalty} - {loadPenalty}{fcpMs > 0 ? ` - ${fcpPenalty}` : ''}{otherPenalty > 0 ? ` - ${otherPenalty}` : ''}</span>
+                        {' = '}
+                        <span className="font-semibold text-cyan-300">{shownScore}</span>
+                      </p>
+                    </div>
+
+                    <div className="xl:col-span-5 rounded-lg border border-cyan-500/20 bg-slate-950/70 p-3">
+                      <p className="text-[11px] uppercase tracking-wider text-cyan-400 mb-2">Score vs Time Visualization</p>
+                      <div className="h-48">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <ComposedChart data={scoreTimeline}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.45} />
+                            <XAxis
+                              dataKey="timeTick"
+                              tick={{ fill: '#94a3b8', fontSize: 10 }}
+                              axisLine={{ stroke: '#334155' }}
+                              tickLine={{ stroke: '#334155' }}
+                            />
+                            <YAxis
+                              domain={[chartYMin, 100]}
+                              tick={{ fill: '#94a3b8', fontSize: 10 }}
+                              axisLine={{ stroke: '#334155' }}
+                              tickLine={{ stroke: '#334155' }}
+                            />
+                            <RechartsTooltip
+                              contentStyle={{ backgroundColor: '#020617', border: '1px solid #1e293b', borderRadius: '8px' }}
+                              itemStyle={{ color: '#fff' }}
+                              formatter={(value: any, name: any, item: any) => {
+                                if (name === 'Score (bar)' || name === 'Score trend') {
+                                  return [`${value}`, name];
+                                }
+                                return [value, name];
+                              }}
+                              labelFormatter={(_: any, payload: any) => {
+                                if (payload?.[0]?.payload) {
+                                  return `${payload[0].payload.step} - ${payload[0].payload.timeMs}ms`;
+                                }
+                                return '';
+                              }}
+                            />
+                            <Legend wrapperStyle={{ fontSize: 10 }} />
+                            <Bar dataKey="scoreBar" name="Score (bar)" fill="#60a5fa" radius={[4, 4, 0, 0]} barSize={18} />
+                            <Line dataKey="scoreLine" name="Score trend" type="monotone" stroke="#22d3ee" strokeWidth={2.5} dot={{ r: 3, stroke: '#22d3ee', fill: '#0f172a' }} />
+                          </ComposedChart>
+                        </ResponsiveContainer>
                       </div>
-                    )}
-                    
-                    {loadPenalty > 0 && (
-                      <p>
-                        Page Load Time ({loadTimeMs}ms) penalty: <span className="text-rose-300">-{loadPenalty}</span>
+                      <p className="mt-2 text-[10px] text-slate-500">
+                        X-axis shows phase checkpoints with time in ms; Y-axis zooms around this page score range.
                       </p>
-                    )}
-                    
-                    {fcpMs > 0 && fcpPenalty > 0 && (
-                      <p>
-                        First Contentful Paint ({fcpMs}ms) penalty: <span className="text-rose-300">-{fcpPenalty}</span>
-                      </p>
-                    )}
-                    
-                    {otherPenalty > 0 && (
-                      <p>
-                        Other quality signals penalty: <span className="text-rose-300">-{otherPenalty}</span>
-                      </p>
-                    )}
-                    
-                    <p className="pt-2 border-t border-slate-700/60">
-                      Calculation: <span className="text-slate-400">100 - {violationPenalty} - {loadPenalty}{fcpMs > 0 ? ` - ${fcpPenalty}` : ''}{otherPenalty > 0 ? ` - ${otherPenalty}` : ''}</span>
-                      {' = '}
-                      <span className="font-semibold text-cyan-300">{shownScore}</span>
-                    </p>
+                    </div>
                   </div>
                   {(loadTimeMs > 0 || fcpMs > 0) && (
                     <p className="mt-2 text-[11px] text-slate-400">
