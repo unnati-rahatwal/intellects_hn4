@@ -444,7 +444,7 @@ export default function DetailedReportPage({ params }: { params: Promise<{ id: s
           backgroundColor: '#0A0F1C', 
           windowWidth: 1200 // Force wide layout so charts aren't crunched
         },
-        jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' as const }
       };
 
       await html2pdf().set(opt).from(element).save();

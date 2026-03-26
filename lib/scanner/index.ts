@@ -241,8 +241,9 @@ export async function runScan(
             let violationScreenshotPath: string | undefined;
             let selector = '';
             try {
-              selector = node.target?.[0];
-              if (selector && typeof selector === 'string') {
+              const target = node.target?.[0];
+              selector = Array.isArray(target) ? target.join(' ') : String(target);
+              if (selector) {
                 const element = page.locator(selector).first();
                 boundingBox = await element.boundingBox();
 
