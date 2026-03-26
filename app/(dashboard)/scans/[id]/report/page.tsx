@@ -33,6 +33,7 @@ import {
   Cpu
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, Legend } from 'recharts';
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore
 import ReactDiffViewer from 'react-diff-viewer-continued';
 
@@ -63,6 +64,22 @@ interface PageAnalysis {
   };
   aiInsights?: {
     performanceExplanation?: string;
+    browserIssuesExplanation?: string;
+    securityExplanation?: string;
+    axTreeExplanation?: string;
+  };
+  browserIssues?: {
+    type: string;
+    severity: string;
+    message: string;
+  }[];
+  securityHeaders?: {
+    score: number;
+    hasCSP: boolean;
+    hasHSTS: boolean;
+    hasXFrameOptions: boolean;
+    hasXContentTypeOptions: boolean;
+    missingHeaders: string[];
   };
   stageScreenshots?: {
     stage: string;
@@ -75,6 +92,12 @@ interface ViolationNode {
   html: string;
   target: string[];
   failureSummary?: string;
+}
+
+interface VisionSimulation {
+  type: string;
+  base64Image: string;
+  capturedAt: string;
 }
 
 interface Violation {
@@ -97,6 +120,7 @@ interface Violation {
     explanation: string;
     remediatedCode: string;
   };
+  visionDeficiencies?: VisionSimulation[];
 }
 
 interface ScanReport {
@@ -538,7 +562,7 @@ function ViolationCard({
                   alt={`Issue snapshot for ${violation.ruleId}`}
                   className="w-full max-h-56 object-contain bg-black/40 cursor-zoom-in"
                   loading="lazy"
-                  onClick={() => onPreview(violation.screenshotPath, `Issue Snapshot: ${violation.ruleId}`)}
+                  onClick={() => onPreview(violation?.screenshotPath, `Issue Snapshot: ${violation.ruleId}`)}
                 />
               </div>
             )}
@@ -555,14 +579,14 @@ function ViolationCard({
               <div>
                 <h4 className="text-xs font-semibold uppercase tracking-widest text-slate-500 mb-2">Fix Explanation</h4>
                 <p className="text-sm text-slate-300 leading-relaxed border-l-2 border-purple-500 pl-3">
-                  {ai.explanation}
+                  {ai?.explanation}
                 </p>
               </div>
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <h4 className="text-xs font-semibold uppercase tracking-widest text-slate-500">Code Diff</h4>
                   <button
-                    onClick={() => handleCopy(ai.remediatedCode)}
+                    onClick={() => handleCopy(ai?.remediatedCode)}
                     className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white px-2.5 py-1 rounded-md border border-slate-700 transition-all"
                   >
                     {copied ? (
@@ -621,7 +645,7 @@ function ViolationCard({
               This shows how users with different types of colorblindness perceive the target element.
             </p>
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              {violation.visionDeficiencies.map((sim: any, idx: number) => (
+              {violation.visionDeficiencies.map((sim: VisionSimulation, idx: number) => (
                 <div key={idx} className="bg-slate-800/50 rounded-lg p-2 border border-slate-700">
                   <div className="text-xs text-center text-slate-300 font-medium uppercase tracking-wider mb-2">
                     {sim.type}
@@ -1158,7 +1182,7 @@ export default function DetailedReportPage({ params }: { params: Promise<{ id: s
         </div>
 
         {/* AI Performance Explanation (unit-consistent, computed from shown metrics) */}
-        {((scan.performanceSummary?.avgLoadTime || 0) > 0 || (scan.performanceSummary?.avgFcp || 0) > 0) && pages.some((p: { aiInsights?: { performanceExplanation?: string } }) => p.aiInsights?.performanceExplanation) && (
+        {((scan.performanceSummary?.avgLoadTime || 0) > 0 || (scan.performanceSummary?.avgFcp || 0) > 0) && pages.some((p: PageAnalysis) => p.aiInsights?.performanceExplanation) && (
           <div className="mt-6 bg-linear-to-r from-yellow-500/10 to-transparent border border-yellow-500/20 rounded-xl p-4">
             <h4 className="text-sm font-bold text-yellow-400 flex items-center gap-2 mb-2">
               <BrainCircuit className="w-4 h-4" /> AI Performance Analysis
@@ -1196,7 +1220,7 @@ export default function DetailedReportPage({ params }: { params: Promise<{ id: s
                     <span className="text-xs text-slate-400">Score: <span className={`font-bold ${p.accessibilityScore >= 80 ? 'text-green-400' : p.accessibilityScore >= 50 ? 'text-amber-400' : 'text-red-400'}`}>{p.accessibilityScore}%</span></span>
                     <span className="text-xs text-slate-400">Violations: <span className="text-white font-semibold">{p.violationCount}</span></span>
                     <span className="text-xs text-slate-400">Load: <span className="text-white font-semibold">{p.loadTimeMs}ms</span></span>
-                    {p.performanceMetrics?.FirstContentfulPaint > 0 && (
+                    {p.performanceMetrics && p.performanceMetrics.FirstContentfulPaint > 0 && (
                       <span className="text-xs text-slate-400">FCP: <span className="text-white font-semibold">{(p.performanceMetrics.FirstContentfulPaint * 1000).toFixed(0)}ms</span></span>
                     )}
                   </div>
@@ -1250,9 +1274,9 @@ export default function DetailedReportPage({ params }: { params: Promise<{ id: s
           </div>
         </div>
 
-        {pages.some((p: any) => p.browserIssues?.length > 0 || p.aiInsights?.browserIssuesExplanation) ? (
+        {pages.some((p: PageAnalysis) => (p.browserIssues?.length || 0) > 0 || p.aiInsights?.browserIssuesExplanation) ? (
           <div className="space-y-4">
-            {pages.filter((p: any) => p.browserIssues?.length > 0 || p.aiInsights?.browserIssuesExplanation).map((p: any) => (
+            {pages.filter((p: PageAnalysis) => (p.browserIssues?.length || 0) > 0 || p.aiInsights?.browserIssuesExplanation).map((p: PageAnalysis) => (
               <div key={p._id} className="bg-slate-800/50 border border-slate-700/40 rounded-xl p-4">
                 <p className="text-white font-medium text-sm mb-3 truncate">{p.url}</p>
                 {p.aiInsights?.browserIssuesExplanation ? (
@@ -1291,22 +1315,22 @@ export default function DetailedReportPage({ params }: { params: Promise<{ id: s
           </div>
         </div>
 
-        {pages.filter((p: any) => p.securityHeaders).length > 0 ? (
-          <div className="space-y-4">
-            {pages.filter((p: any) => p.securityHeaders).map((p: any) => (
+        {pages.filter((p: PageAnalysis) => p.securityHeaders).length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {pages.filter((p: PageAnalysis) => p.securityHeaders).map((p: PageAnalysis) => (
               <div key={p._id} className="bg-slate-800/50 border border-slate-700/40 rounded-xl p-4">
                 <div className="flex items-center justify-between mb-3">
                   <p className="text-white font-medium text-sm truncate flex-1">{p.url}</p>
                   <span className={`text-xs font-bold px-2 py-1 rounded-full ${p.securityHeaders.score >= 80 ? 'bg-green-500/20 text-green-400' : p.securityHeaders.score >= 50 ? 'bg-amber-500/20 text-amber-400' : 'bg-red-500/20 text-red-400'}`}>
-                    {p.securityHeaders.score}%
+                    {p?.securityHeaders?.score}%
                   </span>
                 </div>
 
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mb-3">
-                  {[{ label: 'Content-Security-Policy', ok: p.securityHeaders.hasCSP },
-                    { label: 'HSTS', ok: p.securityHeaders.hasHSTS },
-                    { label: 'X-Frame-Options', ok: p.securityHeaders.hasXFrameOptions },
-                    { label: 'X-Content-Type-Options', ok: p.securityHeaders.hasXContentTypeOptions },
+                  {[{ label: 'Content-Security-Policy', ok: p.securityHeaders?.hasCSP },
+                    { label: 'HSTS', ok: p.securityHeaders?.hasHSTS },
+                    { label: 'X-Frame-Options', ok: p.securityHeaders?.hasXFrameOptions },
+                    { label: 'X-Content-Type-Options', ok: p.securityHeaders?.hasXContentTypeOptions },
                   ].map(h => (
                     <div key={h.label} className={`flex items-center gap-2 text-xs px-2 py-1.5 rounded-lg ${h.ok ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'}`}>
                       {h.ok ? <Lock className="w-3 h-3" /> : <Unlock className="w-3 h-3" />}
@@ -1314,9 +1338,8 @@ export default function DetailedReportPage({ params }: { params: Promise<{ id: s
                     </div>
                   ))}
                 </div>
-
-                {p.securityHeaders.missingHeaders?.length > 0 && (
-                  <p className="text-xs text-red-400 mb-2">Missing: {p.securityHeaders.missingHeaders.join(', ')}</p>
+                {(p.securityHeaders?.missingHeaders?.length || 0) > 0 && (
+                  <p className="text-xs text-red-400 mb-2">Missing: {p.securityHeaders?.missingHeaders?.join(', ')}</p>
                 )}
 
                 {p.screenshotPath && (
@@ -1366,15 +1389,15 @@ export default function DetailedReportPage({ params }: { params: Promise<{ id: s
           </div>
         </div>
 
-        {pages.some((p: any) => p.aiInsights?.axTreeExplanation) ? (
+        {pages.some((p: PageAnalysis) => p.aiInsights?.axTreeExplanation) ? (
           <div className="space-y-4">
-            {pages.filter((p: any) => p.aiInsights?.axTreeExplanation).map((p: any) => (
+            {pages.filter((p: PageAnalysis) => p.aiInsights?.axTreeExplanation).map((p: PageAnalysis) => (
               <div key={p._id} className="bg-slate-800/50 border border-slate-700/40 rounded-xl p-4">
                 <p className="text-white font-medium text-sm mb-3 truncate">{p.url}</p>
                 <div className="bg-linear-to-r from-violet-500/10 to-transparent rounded-lg p-3 border border-violet-500/20">
                   <p className="text-sm text-slate-300 leading-relaxed flex gap-2">
                     <BrainCircuit className="w-4 h-4 text-violet-400 mt-0.5 shrink-0" />
-                    {p.aiInsights.axTreeExplanation}
+                    {p?.aiInsights?.axTreeExplanation}
                   </p>
                 </div>
               </div>
@@ -1411,8 +1434,8 @@ export default function DetailedReportPage({ params }: { params: Promise<{ id: s
           const SEVERITY_LABELS: Record<string, string> = { critical: 'Critical', serious: 'Serious', moderate: 'Moderate', minor: 'Minor' };
 
           // Group violations by pageUrl
-          const grouped: Record<string, typeof violations> = {};
-          violations.forEach((v: any) => {
+          const grouped: Record<string, Violation[]> = {};
+          violations.forEach((v: Violation) => {
             const key = v.pageUrl || 'Unknown';
             if (!grouped[key]) grouped[key] = [];
             grouped[key].push(v);
@@ -1454,7 +1477,7 @@ export default function DetailedReportPage({ params }: { params: Promise<{ id: s
           }
 
           const drillViolations = isDrillDown
-            ? violations.filter((v: any) => v.pageUrl === drillUrl && v.impact === drillImpact)
+            ? violations.filter((v: Violation) => v.pageUrl === drillUrl && v.impact === drillImpact)
             : [];
 
           const setDetailId = (id: string | null) => {
@@ -1504,20 +1527,20 @@ export default function DetailedReportPage({ params }: { params: Promise<{ id: s
                           cursor={{ fill: 'rgba(255,255,255,0.03)' }}
                         />
                         <Legend verticalAlign="top" height={36} iconType="circle" />
-                        {(['critical', 'serious', 'moderate', 'minor'] as const).map((sev, i) => (
+                        {(['critical', 'serious', 'moderate', 'minor'] as const).map((impact) => (
                           <Bar
-                            key={sev}
-                            dataKey={sev}
-                            name={SEVERITY_LABELS[sev]}
+                            key={impact}
+                            dataKey={impact}
+                            name={SEVERITY_LABELS[impact]}
                             stackId="a"
-                            fill={SEVERITY_COLORS[sev]}
-                            radius={i === 3 ? [4, 4, 0, 0] : [0, 0, 0, 0]}
-                            onClick={(data: any) => {
-                              if (data && data[sev] > 0) {
-                                setSelectedViolationId(`drill:${data.fullUrl}:${sev}`);
+                            fill={SEVERITY_COLORS[impact]}
+                            radius={[0, 0, 0, 0]}
+                            className="cursor-pointer hover:opacity-80 transition-opacity"
+                            onClick={(data_obj: { fullUrl: string }) => {
+                              if (data_obj && data_obj.fullUrl) {
+                                setSelectedViolationId(`drill:${data_obj.fullUrl}:${impact}`);
                               }
                             }}
-                            className="cursor-pointer transition-opacity hover:opacity-80"
                           />
                         ))}
                       </BarChart>
