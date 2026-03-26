@@ -69,12 +69,30 @@ document.getElementById('audit-btn').addEventListener('click', async () => {
             `;
             
             document.getElementById('seo-metrics').innerHTML = `
-                <div class="metric-row"><span class="metric-label">Page Title</span><span class="metric-value ${seo.title !== 'Missing Title' ? 'metric-pass' : 'metric-fail'}">${seo.title === 'Missing Title' ? 'Fail' : 'Pass'}</span></div>
-                <div class="metric-row"><span class="metric-label">Heading 1 (H1)</span><span class="metric-value ${seo.hasH1 ? 'metric-pass' : 'metric-fail'}">${seo.hasH1 ? 'Present' : 'Missing'}</span></div>
-                <div class="metric-row"><span class="metric-label">Meta Description</span><span class="metric-value ${seo.metaDesc !== 'Missing' ? 'metric-pass' : 'metric-warn'}">${seo.metaDesc !== 'Missing' ? 'Pass' : 'Missing'}</span></div>
-                <div class="metric-row"><span class="metric-label">Document Lang</span><span class="metric-value ${seo.lang !== 'Missing' ? 'metric-pass' : 'metric-warn'}">${seo.lang}</span></div>
-                <div class="metric-row"><span class="metric-label">Viewport Meta</span><span class="metric-value ${seo.viewport ? 'metric-pass' : 'metric-fail'}">${seo.viewport ? 'Present' : 'Missing'}</span></div>
-                <div class="metric-row"><span class="metric-label">Canonical Link</span><span class="metric-value ${seo.canonical ? 'metric-pass' : 'metric-warn'}">${seo.canonical ? 'Present' : 'Missing'}</span></div>
+                <details class="metric-card">
+                    <summary class="metric-summary"><span class="metric-label">Page Title <span style="opacity:0.5;font-size:10px">▼</span></span><span class="metric-value ${seo.title !== 'Missing Title' ? 'metric-pass' : 'metric-fail'}">${seo.title === 'Missing Title' ? 'Fail' : 'Pass'}</span></summary>
+                    <div class="metric-desc">The primary text shown in browser tabs and search engine results. A concise title is crucial for click-through rates.</div>
+                </details>
+                <details class="metric-card">
+                    <summary class="metric-summary"><span class="metric-label">Heading 1 (H1) <span style="opacity:0.5;font-size:10px">▼</span></span><span class="metric-value ${seo.hasH1 ? 'metric-pass' : 'metric-fail'}">${seo.hasH1 ? 'Present' : 'Missing'}</span></summary>
+                    <div class="metric-desc">The main heading of your page. Search engines use the H1 tag to understand the core topic of your content.</div>
+                </details>
+                <details class="metric-card">
+                    <summary class="metric-summary"><span class="metric-label">Meta Description <span style="opacity:0.5;font-size:10px">▼</span></span><span class="metric-value ${seo.metaDesc !== 'Missing' ? 'metric-pass' : 'metric-warn'}">${seo.metaDesc !== 'Missing' ? 'Pass' : 'Missing'}</span></summary>
+                    <div class="metric-desc">The summary snippet displayed below a search engine result. It heavily influences whether users click your link.</div>
+                </details>
+                <details class="metric-card">
+                    <summary class="metric-summary"><span class="metric-label">Document Lang <span style="opacity:0.5;font-size:10px">▼</span></span><span class="metric-value ${seo.lang !== 'Missing' ? 'metric-pass' : 'metric-warn'}">${seo.lang}</span></summary>
+                    <div class="metric-desc">Declares the language of the page (e.g., 'en'). Critical for localized search rankings and screen readers.</div>
+                </details>
+                <details class="metric-card">
+                    <summary class="metric-summary"><span class="metric-label">Viewport Meta <span style="opacity:0.5;font-size:10px">▼</span></span><span class="metric-value ${seo.viewport ? 'metric-pass' : 'metric-fail'}">${seo.viewport ? 'Present' : 'Missing'}</span></summary>
+                    <div class="metric-desc">Ensures your website scales correctly on mobile devices. Mobile usability is a major ranking factor.</div>
+                </details>
+                <details class="metric-card">
+                    <summary class="metric-summary"><span class="metric-label">Canonical Link <span style="opacity:0.5;font-size:10px">▼</span></span><span class="metric-value ${seo.canonical ? 'metric-pass' : 'metric-warn'}">${seo.canonical ? 'Present' : 'Missing'}</span></summary>
+                    <div class="metric-desc">Tells search engines which URL is the "master" version of a page, preventing duplicate content penalties.</div>
+                </details>
             `;
             
             document.getElementById('bp-metrics').innerHTML = `

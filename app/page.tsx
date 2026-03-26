@@ -59,7 +59,7 @@ export default function Home() {
             WCAG 2.2 aligned · Multi-page analysis · AI-assisted fixes
           </div>
 
-          <h1 className="text-5xl md:text-7xl lg:text-8xl font-black text-white tracking-tight mb-8 leading-[1.1] drop-shadow-2xl">
+          <h1 className="text-9xl md:text-7xl lg:text-8xl font-black text-white tracking-tight mb-8 leading-[1.1] drop-shadow-2xl">
             See Your Website <br className="hidden md:block" /> the Way{" "}
             <span className="text-transparent bg-clip-text bg-linear-to-r from-orange-400 via-fuchsia-400 to-purple-400 drop-shadow-sm">
               Users Actually Experience It
@@ -429,7 +429,7 @@ export default function Home() {
         
         <div className="max-w-4xl mx-auto px-6 relative z-10">
           <h2 className="text-5xl md:text-6xl font-black text-white mb-8 leading-tight tracking-tight drop-shadow-2xl">
-            Make Your Web App Accessible — <br className="hidden md:block" />
+            Make Your Web App Accessible - <br className="hidden md:block" />
             <span className="text-transparent bg-clip-text bg-linear-to-r from-orange-400 to-fuchsia-400">
               Without Guesswork.
             </span>
