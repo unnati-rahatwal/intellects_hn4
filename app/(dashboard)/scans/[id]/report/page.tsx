@@ -26,11 +26,102 @@ import {
   Layers,
   Download,
   Printer,
-  X
+  Copy,
+  Check,
+  X,
+  Terminal,
+  Cpu
 } from 'lucide-react';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, Legend } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, Legend } from 'recharts';
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore
 import ReactDiffViewer from 'react-diff-viewer-continued';
+
+interface BoundingBox {
+  label: string;
+  confidence: number;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  color?: string;
+}
+
+interface PageAnalysis {
+  _id: string;
+  url: string;
+  accessibilityScore: number;
+  violationCount: number;
+  loadTimeMs: number;
+  screenshotPath?: string;
+  createdAt: string;
+  performanceMetrics?: {
+    FirstContentfulPaint: number;
+    LargestContentfulPaint: number;
+    CumulativeLayoutShift: number;
+    TotalBlockingTime: number;
+    InteractionToNextPaint?: number;
+  };
+  aiInsights?: {
+    performanceExplanation?: string;
+    browserIssuesExplanation?: string;
+    securityExplanation?: string;
+    axTreeExplanation?: string;
+  };
+  browserIssues?: {
+    type: string;
+    severity: string;
+    message: string;
+  }[];
+  securityHeaders?: {
+    score: number;
+    hasCSP: boolean;
+    hasHSTS: boolean;
+    hasXFrameOptions: boolean;
+    hasXContentTypeOptions: boolean;
+    missingHeaders: string[];
+  };
+  stageScreenshots?: {
+    stage: string;
+    imageData: string;
+    capturedAt: string;
+  }[];
+}
+
+interface ViolationNode {
+  html: string;
+  target: string[];
+  failureSummary?: string;
+}
+
+interface VisionSimulation {
+  type: string;
+  base64Image: string;
+  capturedAt: string;
+}
+
+interface Violation {
+  _id: string;
+  id: string;
+  ruleId: string;
+  impact: 'critical' | 'serious' | 'moderate' | 'minor';
+  help: string;
+  description: string;
+  nodes: ViolationNode[];
+  tags: string[];
+  pageUrl?: string;
+  cssSelector?: string;
+  htmlSnippet?: string;
+  screenshotPath?: string;
+  failureSummary?: string;
+  aiRemediation?: {
+    status: 'PENDING' | 'GENERATED' | 'FAILED';
+    analysis: string;
+    explanation: string;
+    remediatedCode: string;
+  };
+  visionDeficiencies?: VisionSimulation[];
+}
 
 interface ScanReport {
   scan: {
@@ -56,8 +147,8 @@ interface ScanReport {
     };
     pagesScanned?: number;
   };
-  pages: any[];
-  violations: any[];
+  pages: PageAnalysis[];
+  violations: Violation[];
 }
 
 const SEVERITY_COLORS = {
@@ -74,6 +165,271 @@ const STAGE_LABELS: Record<string, string> = {
   VISION_EMULATION: 'Vision Emulation',
   FINAL: 'Final Snapshot',
 };
+
+function GradCamModal({
+  imageUrl,
+  title,
+  onClose,
+}: {
+  imageUrl: string;
+  title: string;
+  onClose: () => void;
+}) {
+  const [scanProgress, setScanProgress] = useState(0);
+  const [scanPhase, setScanPhase] = useState<'initializing' | 'scanning' | 'analyzing' | 'complete'>('initializing');
+  const [analysisLogs, setAnalysisLogs] = useState<{ time: string; msg: string; type: 'info' | 'warn' | 'error' | 'success' }[]>([]);
+  const [boundingBoxes, setBoundingBoxes] = useState<BoundingBox[]>([]);
+
+  useEffect(() => {
+    // Prevent background scrolling
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = 'auto';
+    };
+  }, []);
+
+  const addLog = (msg: string, type: 'info' | 'warn' | 'error' | 'success' = 'info') => {
+    setAnalysisLogs(prev => [...prev, { time: new Date().toISOString().split('T')[1].slice(0, 12), msg, type }]);
+  };
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const runVisionAnalysis = async () => {
+      setScanPhase('initializing');
+      addLog('Initializing Vision Model (Qwen2-VL-7B-Instruct)...', 'info');
+      setScanProgress(15);
+      
+      await new Promise(r => setTimeout(r, 800));
+      if (!isMounted) return;
+      
+      setScanPhase('scanning');
+      addLog('Ingesting visual context and structural DOM layout...', 'info');
+      setScanProgress(45);
+
+      try {
+        // Compress image before sending to VLM to avoid 413 Payload Too Large
+        const resizedImage = await new Promise<string>((resolve) => {
+          const img = new window.Image();
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            const MAX_DIM = 800;
+            let { width, height } = img;
+            if (width > height && width > MAX_DIM) {
+              height = Math.round((height * MAX_DIM) / width);
+              width = MAX_DIM;
+            } else if (height > MAX_DIM) {
+              width = Math.round((width * MAX_DIM) / height);
+              height = MAX_DIM;
+            }
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+              ctx.drawImage(img, 0, 0, width, height);
+              resolve(canvas.toDataURL('image/jpeg', 0.6));
+            } else {
+              resolve(imageUrl);
+            }
+          };
+          img.onerror = () => resolve(imageUrl);
+          img.src = imageUrl;
+        });
+
+        const res = await fetch('/api/vision', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ imageUrl: resizedImage })
+        });
+        
+        if (!res.ok) throw new Error(`Vision API failed: ${res.statusText}`);
+        
+        const data = await res.json();
+        if (!isMounted) return;
+
+        setScanProgress(80);
+        setScanPhase('analyzing');
+        addLog('Applying structural heuristics & LLM bounding boxes...', 'info');
+
+        if (data.analysisLogs) {
+          data.analysisLogs.forEach((logStr: string) => addLog(logStr, 'warn'));
+        } else if (data.explanation) {
+          addLog(data.explanation.slice(0, 100) + '...', 'warn');
+        }
+
+        if (data.boundingBoxes) {
+          setBoundingBoxes(data.boundingBoxes);
+        }
+
+        await new Promise(r => setTimeout(r, 600));
+        if (!isMounted) return;
+
+        setScanProgress(100);
+        setScanPhase('complete');
+        addLog('Visual analysis complete.', 'success');
+        
+      } catch (err) {
+        if (!isMounted) return;
+        setScanProgress(100);
+        setScanPhase('complete');
+        addLog(err instanceof Error ? err.message : 'Vision analysis failed.', 'error');
+      }
+    };
+
+    runVisionAnalysis();
+    
+    return () => { isMounted = false; };
+  }, [imageUrl]);
+
+  return (
+    <div
+      className="fixed inset-0 z-100 bg-black/95 backdrop-blur-xl flex items-center justify-center p-4 print:hidden"
+      onClick={onClose}
+    >
+      <div 
+        className="relative w-full max-w-6xl h-[85vh] bg-slate-900 border border-slate-700/50 rounded-2xl overflow-hidden flex flex-col md:flex-row"
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Main Viewport */}
+        <div className="flex-1 relative bg-black flex items-center justify-center border-r border-slate-800">
+          <div className="absolute top-4 left-4 z-10 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-lg border border-slate-700/50">
+            <h3 className="text-white font-medium flex items-center gap-2">
+              <Eye className="w-4 h-4 text-blue-400" />
+              Vision AI Analysis
+            </h3>
+            <p className="text-xs text-slate-400 mt-0.5">{title}</p>
+          </div>
+
+          <div className="relative max-w-full max-h-full inline-block group overflow-hidden">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={imageUrl}
+              alt={title}
+              className={`max-w-full max-h-[85vh] object-contain transition-all duration-1000 ${
+                scanPhase !== 'complete' ? 'grayscale opacity-75 blur-[2px]' : 'grayscale-0 opacity-100 blur-0'
+              }`}
+            />
+
+            {/* AI Heatmap Overlay */}
+            <div 
+              className={`absolute inset-0 mix-blend-screen opacity-60 transition-opacity duration-1000 pointer-events-none ${
+                scanPhase !== 'complete' ? 'opacity-80' : 'opacity-30'
+              }`}
+              style={{
+                backgroundImage: scanPhase === 'complete' 
+                  ? 'radial-gradient(circle at 50% 50%, rgba(34,211,238,0.1) 0%, transparent 70%)'
+                  : 'repeating-linear-gradient(0deg, rgba(34,211,238,0.05) 0px, rgba(34,211,238,0.05) 1px, transparent 1px, transparent 4px)',
+                backgroundSize: '100% 4px'
+              }}
+            />
+
+            {/* Bounding Boxes */}
+            {scanPhase === 'complete' && boundingBoxes.length > 0 && boundingBoxes.map((box, i) => (
+              <div 
+                key={i}
+                className="absolute border-2 border-red-500 bg-red-500/10 shadow-[0_0_15px_rgba(239,68,68,0.5)] transition-all animate-pulse-slow"
+                style={{
+                  left: `${Math.max(0, Math.min(100, box.x))}%`,
+                  top: `${Math.max(0, Math.min(100, box.y))}%`,
+                  width: `${Math.max(1, Math.min(100, box.w))}%`,
+                  height: `${Math.max(1, Math.min(100, box.h))}%`,
+                }}
+              >
+                <span className="absolute -top-6 left-0 bg-red-600 text-white text-[10px] font-mono px-1.5 py-0.5 rounded-sm whitespace-nowrap shadow-md">
+                  {box.label} [{(box.confidence * 100).toFixed(0)}%]
+                </span>
+              </div>
+            ))}
+
+            {/* Scanning Laser */}
+            {scanPhase !== 'complete' && (
+              <div 
+                className="absolute left-0 right-0 h-1 bg-cyan-400 shadow-[0_0_20px_4px_rgba(34,211,238,0.7)] z-20"
+                style={{
+                  top: `${scanProgress}%`,
+                  transition: 'top 0.8s ease-out'
+                }}
+              />
+            )}
+            
+            {/* Viewfinder Corners */}
+            <div className="absolute top-0 left-0 w-8 h-8 border-t-2 border-l-2 border-cyan-500/50" />
+            <div className="absolute top-0 right-0 w-8 h-8 border-t-2 border-r-2 border-cyan-500/50" />
+            <div className="absolute bottom-0 left-0 w-8 h-8 border-b-2 border-l-2 border-cyan-500/50" />
+            <div className="absolute bottom-0 right-0 w-8 h-8 border-b-2 border-r-2 border-cyan-500/50" />
+          </div>
+        </div>
+
+        {/* Neural Diagnostics Sidebar */}
+        <div className="w-full md:w-80 bg-slate-900 flex flex-col border-l border-slate-800">
+          <div className="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-800/20">
+            <div className="flex items-center gap-2">
+              <Cpu className="w-4 h-4 text-slate-400" />
+              <h3 className="text-sm font-semibold text-slate-300">Neural Diagnostics</h3>
+            </div>
+            <button 
+              onClick={onClose}
+              className="p-1.5 hover:bg-slate-700/50 rounded-lg transition-colors text-slate-400 hover:text-white"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          <div className="p-4 space-y-4">
+            <div>
+              <div className="flex justify-between text-xs mb-1.5">
+                <span className="text-slate-400 uppercase tracking-wider font-semibold">Vision Model Status</span>
+                <span className="text-cyan-400 font-mono">{scanProgress}%</span>
+              </div>
+              <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-cyan-500 rounded-full shadow-[0_0_10px_rgba(6,182,212,0.5)] transition-all duration-500"
+                  style={{ width: `${scanProgress}%` }}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 text-xs font-mono">
+              <div className="bg-slate-800/40 p-2 rounded border border-slate-700/50">
+                <span className="text-slate-500 block mb-1">Arch</span>
+                <span className="text-slate-300">QWen2-VL</span>
+              </div>
+              <div className="bg-slate-800/40 p-2 rounded border border-slate-700/50">
+                <span className="text-slate-500 block mb-1">Params</span>
+                <span className="text-slate-300">7B</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex-1 bg-black/40 border-t border-slate-800 flex flex-col min-h-0">
+            <div className="px-4 py-2 border-b border-slate-800/50 bg-slate-800/20 text-xs font-semibold uppercase tracking-wider text-slate-500 flex items-center justify-between">
+              <span>Activity Log</span>
+              <Terminal className="w-3 h-3" />
+            </div>
+            <div className="flex-1 overflow-y-auto p-4 space-y-2 font-mono text-[10px]">
+              {analysisLogs.map((log, i) => (
+                <div key={i} className={`flex gap-3 leading-relaxed ${
+                  log.type === 'error' ? 'text-red-400' :
+                  log.type === 'warn' ? 'text-yellow-400' :
+                  log.type === 'success' ? 'text-green-400' : 'text-slate-400'
+                }`}>
+                  <span className="text-slate-600 shrink-0">[{log.time}]</span>
+                  <span className="break-words">{log.msg}</span>
+                </div>
+              ))}
+              {scanPhase !== 'complete' && (
+                <div className="flex gap-3 text-cyan-500/50 animate-pulse">
+                  <span className="shrink-0">[{new Date().toISOString().split('T')[1].slice(0, 12)}]</span>
+                  <span>_</span>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function ScoreGauge({ score, label, icon: Icon }: { score: number; label: string; icon: React.ElementType }) {
   const getScoreColor = (s: number) => {
@@ -120,10 +476,17 @@ function ViolationCard({
   violation,
   onPreview,
 }: {
-  violation: any;
+  violation: Violation;
   onPreview: (url: string, title: string) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const [copied, setCopied] = useState(false);
+  
+  const handleCopy = (text: string) => {
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
   const ai = violation.aiRemediation;
   const status = ai?.status || 'PENDING';
   const hasAi = status === 'GENERATED';
@@ -199,7 +562,7 @@ function ViolationCard({
                   alt={`Issue snapshot for ${violation.ruleId}`}
                   className="w-full max-h-56 object-contain bg-black/40 cursor-zoom-in"
                   loading="lazy"
-                  onClick={() => onPreview(violation.screenshotPath, `Issue Snapshot: ${violation.ruleId}`)}
+                  onClick={() => onPreview(violation?.screenshotPath, `Issue Snapshot: ${violation.ruleId}`)}
                 />
               </div>
             )}
@@ -216,12 +579,28 @@ function ViolationCard({
               <div>
                 <h4 className="text-xs font-semibold uppercase tracking-widest text-slate-500 mb-2">Fix Explanation</h4>
                 <p className="text-sm text-slate-300 leading-relaxed border-l-2 border-purple-500 pl-3">
-                  {ai.explanation}
+                  {ai?.explanation}
                 </p>
               </div>
               <div>
-                <h4 className="text-xs font-semibold uppercase tracking-widest text-slate-500 mb-2">Code Diff</h4>
-                <div className="rounded-lg overflow-hidden border border-slate-800">
+                <div className="flex items-center justify-between mb-2">
+                  <h4 className="text-xs font-semibold uppercase tracking-widest text-slate-500">Code Diff</h4>
+                  <button
+                    onClick={() => handleCopy(ai?.remediatedCode)}
+                    className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white px-2.5 py-1 rounded-md border border-slate-700 transition-all"
+                  >
+                    {copied ? (
+                      <>
+                        <Check className="w-3 h-3 text-green-400" /> Copied
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3 h-3" /> Copy Fixed Code
+                      </>
+                    )}
+                  </button>
+                </div>
+                <div className="rounded-lg overflow-x-auto border border-slate-800 code-scroll">
                   <ReactDiffViewer
                     oldValue={violation.htmlSnippet}
                     newValue={ai.remediatedCode}
@@ -266,7 +645,7 @@ function ViolationCard({
               This shows how users with different types of colorblindness perceive the target element.
             </p>
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              {violation.visionDeficiencies.map((sim: any, idx: number) => (
+              {violation.visionDeficiencies.map((sim: VisionSimulation, idx: number) => (
                 <div key={idx} className="bg-slate-800/50 rounded-lg p-2 border border-slate-700">
                   <div className="text-xs text-center text-slate-300 font-medium uppercase tracking-wider mb-2">
                     {sim.type}
@@ -419,7 +798,7 @@ export default function DetailedReportPage({ params }: { params: Promise<{ id: s
           backgroundColor: '#0A0F1C', 
           windowWidth: 1200 // Force wide layout so charts aren't crunched
         },
-        jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' as const }
       };
 
       await html2pdf().set(opt).from(element).save();
@@ -564,9 +943,9 @@ export default function DetailedReportPage({ params }: { params: Promise<{ id: s
                     Your browser does not support embedded video playback.
                   </video>
                 ) : (
-                  // eslint-disable-next-line jsx-a11y/iframe-has-title
                   <iframe
                     src={videoUrl}
+                    title="Scan Stage Video"
                     className="w-full h-full"
                     allow="autoplay; encrypted-media"
                     allowFullScreen
@@ -802,14 +1181,14 @@ export default function DetailedReportPage({ params }: { params: Promise<{ id: s
           </div>
         </div>
 
-        {/* AI Performance Explanation */}
-        {pages.some((p: any) => p.aiInsights?.performanceExplanation) && (
+        {/* AI Performance Explanation (unit-consistent, computed from shown metrics) */}
+        {((scan.performanceSummary?.avgLoadTime || 0) > 0 || (scan.performanceSummary?.avgFcp || 0) > 0) && pages.some((p: PageAnalysis) => p.aiInsights?.performanceExplanation) && (
           <div className="mt-6 bg-linear-to-r from-yellow-500/10 to-transparent border border-yellow-500/20 rounded-xl p-4">
             <h4 className="text-sm font-bold text-yellow-400 flex items-center gap-2 mb-2">
               <BrainCircuit className="w-4 h-4" /> AI Performance Analysis
             </h4>
             <p className="text-sm text-slate-300 leading-relaxed">
-              {pages.find((p: any) => p.aiInsights?.performanceExplanation)?.aiInsights?.performanceExplanation}
+              {pages.find((p: PageAnalysis) => p.aiInsights?.performanceExplanation)?.aiInsights?.performanceExplanation}
             </p>
           </div>
         )}
@@ -823,7 +1202,7 @@ export default function DetailedReportPage({ params }: { params: Promise<{ id: s
         <p className="text-sm text-slate-400 mb-6">Individual accessibility and performance scores for each analyzed URL</p>
         
         <div className="space-y-3">
-          {pages.map((p: any) => (
+          {pages.map((p: PageAnalysis) => (
             <div key={p._id} className="bg-slate-800/50 border border-slate-700/40 rounded-xl p-4 hover:border-slate-600/60 transition-colors">
               {(() => {
                 const stageShots = Array.isArray(p.stageScreenshots) && p.stageScreenshots.length > 0
@@ -841,7 +1220,7 @@ export default function DetailedReportPage({ params }: { params: Promise<{ id: s
                     <span className="text-xs text-slate-400">Score: <span className={`font-bold ${p.accessibilityScore >= 80 ? 'text-green-400' : p.accessibilityScore >= 50 ? 'text-amber-400' : 'text-red-400'}`}>{p.accessibilityScore}%</span></span>
                     <span className="text-xs text-slate-400">Violations: <span className="text-white font-semibold">{p.violationCount}</span></span>
                     <span className="text-xs text-slate-400">Load: <span className="text-white font-semibold">{p.loadTimeMs}ms</span></span>
-                    {p.performanceMetrics?.FirstContentfulPaint > 0 && (
+                    {p.performanceMetrics && p.performanceMetrics.FirstContentfulPaint > 0 && (
                       <span className="text-xs text-slate-400">FCP: <span className="text-white font-semibold">{(p.performanceMetrics.FirstContentfulPaint * 1000).toFixed(0)}ms</span></span>
                     )}
                   </div>
@@ -855,7 +1234,7 @@ export default function DetailedReportPage({ params }: { params: Promise<{ id: s
                 <div className="mt-4 border-t border-slate-700/50 pt-4">
                   <div className="text-xs text-slate-400 mb-3">Scan Stage Snapshots</div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {stageShots.map((shot: any, idx: number) => (
+                    {stageShots.map((shot: { stage: string; imageData: string; capturedAt: string }, idx: number) => (
                       <div key={`${p._id}-stage-${idx}`} className="bg-slate-900/70 border border-slate-700 rounded-lg overflow-hidden">
                         <div className="px-2 py-1.5 text-[11px] font-medium text-slate-300 border-b border-slate-700">
                           {STAGE_LABELS[shot.stage] || shot.stage}
@@ -895,9 +1274,9 @@ export default function DetailedReportPage({ params }: { params: Promise<{ id: s
           </div>
         </div>
 
-        {pages.some((p: any) => p.browserIssues?.length > 0 || p.aiInsights?.browserIssuesExplanation) ? (
+        {pages.some((p: PageAnalysis) => (p.browserIssues?.length || 0) > 0 || p.aiInsights?.browserIssuesExplanation) ? (
           <div className="space-y-4">
-            {pages.filter((p: any) => p.browserIssues?.length > 0 || p.aiInsights?.browserIssuesExplanation).map((p: any) => (
+            {pages.filter((p: PageAnalysis) => (p.browserIssues?.length || 0) > 0 || p.aiInsights?.browserIssuesExplanation).map((p: PageAnalysis) => (
               <div key={p._id} className="bg-slate-800/50 border border-slate-700/40 rounded-xl p-4">
                 <p className="text-white font-medium text-sm mb-3 truncate">{p.url}</p>
                 {p.aiInsights?.browserIssuesExplanation ? (
@@ -936,22 +1315,22 @@ export default function DetailedReportPage({ params }: { params: Promise<{ id: s
           </div>
         </div>
 
-        {pages.filter((p: any) => p.securityHeaders).length > 0 ? (
-          <div className="space-y-4">
-            {pages.filter((p: any) => p.securityHeaders).map((p: any) => (
+        {pages.filter((p: PageAnalysis) => p.securityHeaders).length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {pages.filter((p: PageAnalysis) => p.securityHeaders).map((p: PageAnalysis) => (
               <div key={p._id} className="bg-slate-800/50 border border-slate-700/40 rounded-xl p-4">
                 <div className="flex items-center justify-between mb-3">
                   <p className="text-white font-medium text-sm truncate flex-1">{p.url}</p>
                   <span className={`text-xs font-bold px-2 py-1 rounded-full ${p.securityHeaders.score >= 80 ? 'bg-green-500/20 text-green-400' : p.securityHeaders.score >= 50 ? 'bg-amber-500/20 text-amber-400' : 'bg-red-500/20 text-red-400'}`}>
-                    {p.securityHeaders.score}%
+                    {p?.securityHeaders?.score}%
                   </span>
                 </div>
 
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mb-3">
-                  {[{ label: 'Content-Security-Policy', ok: p.securityHeaders.hasCSP },
-                    { label: 'HSTS', ok: p.securityHeaders.hasHSTS },
-                    { label: 'X-Frame-Options', ok: p.securityHeaders.hasXFrameOptions },
-                    { label: 'X-Content-Type-Options', ok: p.securityHeaders.hasXContentTypeOptions },
+                  {[{ label: 'Content-Security-Policy', ok: p.securityHeaders?.hasCSP },
+                    { label: 'HSTS', ok: p.securityHeaders?.hasHSTS },
+                    { label: 'X-Frame-Options', ok: p.securityHeaders?.hasXFrameOptions },
+                    { label: 'X-Content-Type-Options', ok: p.securityHeaders?.hasXContentTypeOptions },
                   ].map(h => (
                     <div key={h.label} className={`flex items-center gap-2 text-xs px-2 py-1.5 rounded-lg ${h.ok ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'}`}>
                       {h.ok ? <Lock className="w-3 h-3" /> : <Unlock className="w-3 h-3" />}
@@ -959,9 +1338,8 @@ export default function DetailedReportPage({ params }: { params: Promise<{ id: s
                     </div>
                   ))}
                 </div>
-
-                {p.securityHeaders.missingHeaders?.length > 0 && (
-                  <p className="text-xs text-red-400 mb-2">Missing: {p.securityHeaders.missingHeaders.join(', ')}</p>
+                {(p.securityHeaders?.missingHeaders?.length || 0) > 0 && (
+                  <p className="text-xs text-red-400 mb-2">Missing: {p.securityHeaders?.missingHeaders?.join(', ')}</p>
                 )}
 
                 {p.screenshotPath && (
@@ -1011,15 +1389,15 @@ export default function DetailedReportPage({ params }: { params: Promise<{ id: s
           </div>
         </div>
 
-        {pages.some((p: any) => p.aiInsights?.axTreeExplanation) ? (
+        {pages.some((p: PageAnalysis) => p.aiInsights?.axTreeExplanation) ? (
           <div className="space-y-4">
-            {pages.filter((p: any) => p.aiInsights?.axTreeExplanation).map((p: any) => (
+            {pages.filter((p: PageAnalysis) => p.aiInsights?.axTreeExplanation).map((p: PageAnalysis) => (
               <div key={p._id} className="bg-slate-800/50 border border-slate-700/40 rounded-xl p-4">
                 <p className="text-white font-medium text-sm mb-3 truncate">{p.url}</p>
                 <div className="bg-linear-to-r from-violet-500/10 to-transparent rounded-lg p-3 border border-violet-500/20">
                   <p className="text-sm text-slate-300 leading-relaxed flex gap-2">
                     <BrainCircuit className="w-4 h-4 text-violet-400 mt-0.5 shrink-0" />
-                    {p.aiInsights.axTreeExplanation}
+                    {p?.aiInsights?.axTreeExplanation}
                   </p>
                 </div>
               </div>
@@ -1033,151 +1411,256 @@ export default function DetailedReportPage({ params }: { params: Promise<{ id: s
         )}
       </div>
 
-      {/* detailed Violations section */}
-      <div className="overflow-hidden">
-        <div className="flex items-center justify-between mb-6 border-b border-slate-800 pb-4">
-          <div>
-            <h2 className="text-2xl font-bold text-white flex items-center gap-2">
-              <FileText className="w-6 h-6 text-cyan-500" /> Organizational Violation Tree
-            </h2>
-            <p className="text-sm text-slate-400 mt-1">
-              Issues algorithmically structured by severity hierarchy.
-            </p>
-          </div>
-          <div className="text-sm border border-slate-700 bg-slate-800 px-3 py-1.5 rounded-lg text-slate-400 font-medium">
-            {violations.length} total entries
-          </div>
-        </div>
-
+      {/* Page-Level Violation Analytics - Stacked Bar Chart */}
+      <div className="overflow-hidden border border-slate-700/50 rounded-2xl p-6 bg-slate-900/30">
         <style dangerouslySetInnerHTML={{__html: `
-          .org-wrapper { overflow-x: auto; padding: 24px 20px 40px; display: block; border: 1px solid rgba(255,255,255,0.05); border-radius: 16px; background: rgba(15,23,42,0.4); }
-          .org-wrapper::-webkit-scrollbar { height: 8px; }
-          .org-wrapper::-webkit-scrollbar-track { background: transparent; }
-          .org-wrapper::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
-          .org-wrapper::-webkit-scrollbar-thumb:hover { background: #475569; }
-          .org-tree * { box-sizing: border-box; }
-          
-          /* Left to Right Tree CSS */
-          .org-tree { display: inline-flex; flex-direction: row; align-items: center; justify-content: flex-start; position: relative; margin: 0; min-width: max-content; }
-          .org-node { background: #0f172a; border: 2px solid rgba(255,255,255,0.1); padding: 12px 24px; border-radius: 12px; text-align: left; position: relative; z-index: 2; display: inline-block; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
-          .org-node-leaf { position: relative; z-index: 2; display: inline-block; cursor: pointer; transition: all 0.2s; }
-          .org-node-leaf:hover { transform: translateX(4px); }
-          
-          .org-children { display: flex; flex-direction: column; justify-content: center; padding-left: 40px; position: relative; gap: 16px; }
-          .org-children::before { content: ''; position: absolute; left: 0; top: 50%; width: 40px; border-top: 2px solid #334155; margin-top: -1px; }
-          
-          .org-child { position: relative; display: flex; flex-direction: row; align-items: center; }
-          .org-child::before { content: ''; position: absolute; left: -40px; top: 50%; width: 40px; border-top: 2px solid #334155; margin-top: -1px; }
-          .org-child::after { content: ''; position: absolute; left: -40px; top: 0; height: 100%; border-left: 2px solid #334155; margin-left: -1px; }
-          
-          .org-child:first-child::after { top: 50%; height: 50%; }
-          .org-child:last-child::after { height: 50%; }
-          .org-child:only-child::after { display: none; }
+          @keyframes slideInRight { 0% { opacity:0; transform:translateX(30px); } 100% { opacity:1; transform:translateX(0); } }
+          .animate-slide-in { animation: slideInRight 0.3s ease-out both; }
+          @keyframes fadeIn { 0% { opacity:0; } 100% { opacity:1; } }
+          .animate-fade-in { animation: fadeIn 0.25s ease-out both; }
+          .drilldown-scroll::-webkit-scrollbar { width: 5px; }
+          .drilldown-scroll::-webkit-scrollbar-track { background: transparent; }
+          .drilldown-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
+          .drilldown-scroll::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
+          .code-scroll::-webkit-scrollbar { height: 6px; }
+          .code-scroll::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); }
+          .code-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
+          .code-scroll::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
         `}} />
 
-        <div className="org-wrapper">
-          <div className="org-tree">
-            <div className="org-node" style={{ borderColor: '#22d3ee', boxShadow: '0 0 25px rgba(34,211,238,0.15)', textAlign: 'center' }}>
-               <div className="text-3xl mb-1">📄</div>
-               <div className="text-white font-black tracking-wide text-sm whitespace-nowrap">ROOT VIEW</div>
-               <div className="text-cyan-400 text-[10px] font-bold tracking-widest uppercase mt-1">{violations.length} Issues</div>
-            </div>
-            
-            <div className="org-children">
-              {(() => {
-                const groups = [
-                  { id: 'critical', title: 'CRITICAL', data: violations.filter(v => v.impact === 'critical'), color: { border: '#ef4444', bg: 'rgba(239,68,68,0.15)', text: '#ef4444' } },
-                  { id: 'serious', title: 'SERIOUS', data: violations.filter(v => v.impact === 'serious'), color: { border: '#f97316', bg: 'rgba(249,115,22,0.15)', text: '#f97316' } },
-                  { id: 'moderate', title: 'MODERATE', data: violations.filter(v => v.impact === 'moderate'), color: { border: '#eab308', bg: 'rgba(234,179,8,0.15)', text: '#eab308' } },
-                  { id: 'minor', title: 'MINOR', data: violations.filter(v => v.impact === 'minor'), color: { border: '#3b82f6', bg: 'rgba(59,130,246,0.15)', text: '#3b82f6' } }
-                ].filter(g => g.data.length > 0);
+        {(() => {
+          const SEVERITY_COLORS: Record<string, string> = { critical: '#ef4444', serious: '#f97316', moderate: '#eab308', minor: '#3b82f6' };
+          const SEVERITY_BG: Record<string, string> = { critical: 'rgba(239,68,68,0.15)', serious: 'rgba(249,115,22,0.15)', moderate: 'rgba(234,179,8,0.15)', minor: 'rgba(59,130,246,0.15)' };
+          const SEVERITY_LABELS: Record<string, string> = { critical: 'Critical', serious: 'Serious', moderate: 'Moderate', minor: 'Minor' };
 
-                return (
-                  <>
-                    {groups.map(g => (
-                      <div className="org-child" key={g.id}>
-                        <div className="org-node text-center whitespace-nowrap" style={{ borderColor: g.color.border, backgroundColor: g.color.bg }}>
-                          <div style={{ color: g.color.text }} className="font-extrabold text-sm tracking-widest">{g.title}</div>
-                          <div className="text-[10px] font-bold opacity-90 mt-1" style={{ color: g.color.text }}>{g.data.length} DETECTED</div>
-                        </div>
-                        <div className="org-children">
-                          {g.data.slice(0, 15).map((v: any, i: number) => (
-                            <div className="org-child" key={v._id}>
-                              <div 
-                                className="org-node-leaf text-left w-[260px] whitespace-normal rounded-xl bg-slate-900 border border-slate-700/50 p-3"
-                                onClick={() => setSelectedViolationId(selectedViolationId === v._id ? null : v._id)}
-                                style={{
-                                   borderColor: selectedViolationId === v._id ? g.color.text : 'rgba(255,255,255,0.1)',
-                                   boxShadow: selectedViolationId === v._id ? `0 0 15px ${g.color.bg}` : 'none'
-                                 }}
-                              >
-                                 <div className="flex items-start gap-3 mb-2">
-                                    <div className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0" style={{ backgroundColor: g.color.bg, color: g.color.text }}>
-                                      {i + 1}
-                                    </div>
-                                    <div className="text-xs font-bold text-white leading-tight break-words">{v.ruleId || v.type || 'Issue'}</div>
-                                 </div>
-                                 <div className="text-[11px] text-slate-400 line-clamp-2 leading-relaxed">{v.description || v.suggestion}</div>
-                              </div>
-                            </div>
-                          ))}
-                          {g.data.length > 15 && (
-                            <div className="org-child">
-                              <div className="org-node-leaf text-left w-[260px] whitespace-normal rounded-xl bg-slate-800/50 border border-slate-700/50 p-3 italic text-slate-500 text-xs text-center border-dashed">
-                                + {g.data.length - 15} more {g.title.toLowerCase()} issues
-                              </div>
-                            </div>
-                          )}
+          // Group violations by pageUrl
+          const grouped: Record<string, Violation[]> = {};
+          violations.forEach((v: Violation) => {
+            const key = v.pageUrl || 'Unknown';
+            if (!grouped[key]) grouped[key] = [];
+            grouped[key].push(v);
+          });
+
+          const barData = Object.entries(grouped).map(([url, items]) => {
+            let label = 'root';
+            try {
+              const u = new URL(url);
+              const parts = (u.pathname + u.hash).split(/[/#]/).filter(Boolean);
+              label = parts[parts.length - 1] || u.hostname;
+            } catch { label = url.split('/').filter(Boolean).pop() || url; }
+            return {
+              name: label.length > 18 ? label.substring(0, 16) + '..' : label,
+              fullUrl: url,
+              critical: items.filter(v => v.impact === 'critical').length,
+              serious: items.filter(v => v.impact === 'serious').length,
+              moderate: items.filter(v => v.impact === 'moderate').length,
+              minor: items.filter(v => v.impact === 'minor').length,
+            };
+          });
+
+          // Check if we're in drill-down mode
+          const isDrillDown = selectedViolationId?.startsWith('drill:');
+          let drillUrl = '';
+          let drillImpact = '';
+          let detailId: string | null = null;
+
+          if (isDrillDown && selectedViolationId) {
+            const raw = selectedViolationId;
+            // Extract detail ID if present
+            if (raw.includes('|detail:')) {
+              detailId = raw.split('|detail:')[1];
+            }
+            const base = raw.split('|detail:')[0]; // drill:url:impact
+            const colonParts = base.split(':');
+            drillImpact = colonParts[colonParts.length - 1];
+            drillUrl = colonParts.slice(1, -1).join(':');
+          }
+
+          const drillViolations = isDrillDown
+            ? violations.filter((v: Violation) => v.pageUrl === drillUrl && v.impact === drillImpact)
+            : [];
+
+          const setDetailId = (id: string | null) => {
+            if (id) setSelectedViolationId(`drill:${drillUrl}:${drillImpact}|detail:${id}`);
+            else setSelectedViolationId(`drill:${drillUrl}:${drillImpact}`);
+          };
+
+          // ============ CHART VIEW ============
+          if (!isDrillDown) {
+            return (
+              <>
+                <div className="flex items-center justify-between mb-6 border-b border-slate-800 pb-4">
+                  <div>
+                    <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+                      <Layers className="w-6 h-6 text-cyan-500" /> Page-Level Violation Analytics
+                    </h2>
+                    <p className="text-sm text-slate-400 mt-1">
+                      Interactive stacked chart — click any colored segment to see issues.
+                    </p>
+                  </div>
+                  <div className="text-sm border border-slate-700 bg-slate-800 px-3 py-1.5 rounded-lg text-slate-400 font-medium">
+                    {violations.length} total issues · {barData.length} pages
+                  </div>
+                </div>
+                {barData.length > 0 ? (
+                  <div className="w-full" style={{ height: Math.max(450, barData.length * 60 + 160) + 'px', minHeight: '450px' }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={barData} margin={{ top: 20, right: 30, left: 20, bottom: 70 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                        <XAxis
+                          dataKey="name"
+                          stroke="#94a3b8"
+                          fontSize={12}
+                          fontWeight={600}
+                          tickLine={false}
+                          axisLine={false}
+                          interval={0}
+                          angle={-30}
+                          textAnchor="end"
+                          height={70}
+                        />
+                        <YAxis stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} allowDecimals={false} />
+                        <RechartsTooltip
+                          contentStyle={{ backgroundColor: '#0f172a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', padding: '12px' }}
+                          itemStyle={{ fontSize: '12px', fontWeight: 'bold' }}
+                          labelStyle={{ color: '#fff', fontWeight: 'bold', marginBottom: '4px' }}
+                          cursor={{ fill: 'rgba(255,255,255,0.03)' }}
+                        />
+                        <Legend verticalAlign="top" height={36} iconType="circle" />
+                        {(['critical', 'serious', 'moderate', 'minor'] as const).map((impact) => (
+                          <Bar
+                            key={impact}
+                            dataKey={impact}
+                            name={SEVERITY_LABELS[impact]}
+                            stackId="a"
+                            fill={SEVERITY_COLORS[impact]}
+                            radius={[0, 0, 0, 0]}
+                            className="cursor-pointer hover:opacity-80 transition-opacity"
+                            onClick={(data_obj: { fullUrl: string }) => {
+                              if (data_obj && data_obj.fullUrl) {
+                                setSelectedViolationId(`drill:${data_obj.fullUrl}:${impact}`);
+                              }
+                            }}
+                          />
+                        ))}
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                ) : (
+                  <div className="h-64 flex items-center justify-center border border-white/5 bg-white/5 rounded-xl">
+                    <p className="text-slate-500 text-sm">No violations detected for this scan.</p>
+                  </div>
+                )}
+              </>
+            );
+          }
+
+          // ============ DRILL-DOWN VIEW (inline, replaces chart) ============
+          let pageLabel = drillUrl;
+          try {
+            const u = new URL(drillUrl);
+            pageLabel = u.pathname + (u.hash || '');
+            if (pageLabel === '/') pageLabel = u.hostname;
+          } catch { /* keep raw */ }
+
+          return (
+            <div className="animate-slide-in">
+              {/* Header with back button + page name */}
+              <div className="flex items-center gap-4 mb-5 pb-4 border-b border-slate-800">
+                <button
+                  onClick={() => setSelectedViolationId(null)}
+                  className="flex items-center gap-2 text-sm font-semibold text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 pl-3 pr-4 py-2 rounded-xl transition-all border border-slate-700 hover:border-slate-500 shrink-0"
+                >
+                  <ArrowLeft className="w-4 h-4" /> Back to Chart
+                </button>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <Globe className="w-5 h-5 text-cyan-400 shrink-0" />
+                    <h2 className="text-xl font-bold text-white truncate">{pageLabel}</h2>
+                    <span
+                      className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider shrink-0"
+                      style={{ backgroundColor: SEVERITY_BG[drillImpact], color: SEVERITY_COLORS[drillImpact] }}
+                    >
+                      <span className="w-2 h-2 rounded-full" style={{ backgroundColor: SEVERITY_COLORS[drillImpact] }} />
+                      {drillImpact} · {drillViolations.length} issues
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-1 font-mono truncate">{drillUrl}</p>
+                </div>
+              </div>
+
+              {/* Split panel: list + detail */}
+              <div className="flex gap-0 border border-white/5 rounded-2xl overflow-hidden bg-slate-900/50" style={{ minHeight: '560px' }}>
+                {/* Left: Issue List */}
+                <div className={`${detailId ? 'w-[38%] border-r border-white/5' : 'w-full'} overflow-y-auto drilldown-scroll transition-all`} style={{ maxHeight: '600px' }}>
+                  <div className="p-3 space-y-1.5">
+                    {drillViolations.map((v: Violation, idx: number) => (
+                      <div
+                        key={v._id}
+                        onClick={() => setDetailId(detailId === v._id ? null : v._id)}
+                        className={`group p-3.5 rounded-xl cursor-pointer transition-all border ${
+                          detailId === v._id
+                            ? 'border-l-2 bg-white/[0.06]'
+                            : 'border-transparent hover:bg-white/[0.03]'
+                        }`}
+                        style={detailId === v._id ? { borderLeftColor: SEVERITY_COLORS[drillImpact] } : {}}
+                      >
+                        <div className="flex items-start gap-3">
+                          <span
+                            className="text-[10px] font-bold rounded-md w-6 h-6 flex items-center justify-center shrink-0"
+                            style={{ backgroundColor: SEVERITY_BG[drillImpact], color: SEVERITY_COLORS[drillImpact] }}
+                          >
+                            {idx + 1}
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-semibold text-white group-hover:text-cyan-300 transition-colors">{v.ruleId}</p>
+                            <p className="text-xs text-slate-400 mt-0.5 line-clamp-2">{v.description}</p>
+                          </div>
+                          <ChevronDown className={`w-4 h-4 text-slate-600 shrink-0 mt-0.5 transition-transform ${detailId === v._id ? 'rotate-180 text-slate-300' : ''}`} />
                         </div>
                       </div>
                     ))}
-                  </>
-                );
-              })()}
-            </div>
-          </div>
-        </div>
+                    {drillViolations.length === 0 && (
+                      <div className="text-center py-12 text-slate-500 text-sm">No issues found for this selection.</div>
+                    )}
+                  </div>
+                </div>
 
-        {/* Selected Issue Full Detail View */}
-        {selectedViolationId && (
-           <div className="mt-8 border border-slate-700/50 bg-slate-900/50 rounded-2xl p-6 animate-fade-in shadow-2xl relative">
-              <div className="flex items-center justify-between mb-4 pb-4 border-b border-slate-800">
-                 <h3 className="text-xl font-bold text-white flex items-center gap-2"><FileText className="w-5 h-5 text-cyan-400"/> Issue Deep Dive</h3>
-                 <button onClick={() => setSelectedViolationId(null)} className="flex items-center gap-2 text-xs font-bold text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded-lg transition-colors border border-slate-700"><X className="w-4 h-4"/> Close Display</button>
+                {/* Right: Detail Panel */}
+                {detailId && (() => {
+                  const detail = violations.find((v: Violation) => v._id === detailId);
+                  if (!detail) return null;
+                  return (
+                    <div className="w-[62%] overflow-y-auto drilldown-scroll animate-slide-in" style={{ maxHeight: '600px' }}>
+                      <div className="p-5">
+                        <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-800">
+                          <h3 className="text-base font-bold text-white flex items-center gap-2">
+                            <FileText className="w-4 h-4 text-cyan-400" /> Issue Details
+                          </h3>
+                          <button
+                            onClick={() => setDetailId(null)}
+                            className="text-xs text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 px-2.5 py-1 rounded-lg transition-colors border border-slate-700 flex items-center gap-1"
+                          >
+                            <X className="w-3.5 h-3.5" /> Close
+                          </button>
+                        </div>
+                        <ViolationCard violation={detail} onPreview={handlePreviewImage} />
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
-              <ViolationCard violation={violations.find((v: any) => v._id === selectedViolationId)} onPreview={handlePreviewImage} />
-           </div>
-        )}
+            </div>
+          );
+        })()}
       </div>
 
       {previewImage && typeof window !== 'undefined' && createPortal(
-        <div
-          className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 print:hidden"
-          onClick={() => setPreviewImage(null)}
-        >
-          <div
-            className="relative w-full max-w-6xl h-[92vh] border border-slate-700 rounded-xl bg-slate-950/95 overflow-hidden"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800 bg-slate-900/80">
-              <p className="text-sm text-slate-200 truncate pr-4">{previewImage?.title}</p>
-              <button
-                type="button"
-                onClick={() => setPreviewImage(null)}
-                className="p-1.5 rounded-md hover:bg-slate-800 text-slate-300 hover:text-white transition-colors"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-            <div className="w-full h-[calc(92vh-52px)] flex items-center justify-center bg-black/80 overflow-hidden">
-              <img
-                src={previewImage?.url}
-                alt={previewImage?.title}
-                className="max-w-full max-h-full object-contain"
-              />
-            </div>
-          </div>
-        </div>,
+        <GradCamModal
+          imageUrl={previewImage.url}
+          title={previewImage.title}
+          onClose={() => setPreviewImage(null)}
+        />,
         document.body
       )}
     </div>
