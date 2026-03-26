@@ -81,3 +81,47 @@ export function isPrivateUrl(url: string): boolean {
     return true;
   }
 }
+
+export async function extractSecurityContext(page: any) {
+  try {
+     const data = await page.evaluate(() => {
+        const getStorage = (storage: Storage) => {
+           const map: Record<string, string> = {};
+           try {
+             for (let i = 0; i < storage.length; i++) {
+                const key = storage.key(i);
+                if (key) map[key] = storage.getItem(key) || '';
+             }
+           } catch (e) {}
+           return map;
+        };
+
+        const forms = Array.from(document.querySelectorAll('form')).map(f => ({
+           action: f.action || '',
+           method: f.method || 'get',
+           inputs: Array.from(f.querySelectorAll('input, select, textarea')).map((el: any) => ({
+              name: el.name || '',
+              type: el.type || el.tagName.toLowerCase(),
+              id: el.id || ''
+           }))
+        }));
+
+        const scripts = Array.from(document.querySelectorAll('script'))
+           .map(s => s.src ? `[External JS: ${s.src}]` : `[Inline]: ${s.innerHTML.substring(0, 1000)}`)
+           .filter(Boolean);
+
+        return {
+           localStorage: getStorage(window.localStorage),
+           sessionStorage: getStorage(window.sessionStorage),
+           forms,
+           scripts: scripts.slice(0, 30) // limit size to first 30 scripts to avoid overwhelming context window
+        };
+     });
+     
+     const cookies = await page.context().cookies(page.url());
+
+     return { ...data, cookies };
+  } catch(e) {
+     return null;
+  }
+}

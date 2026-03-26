@@ -30,9 +30,11 @@ export interface IPage extends Document {
   performanceMetrics: Record<string, unknown> | null;
   browserIssues: unknown[];
   accessibilityTreeSnapshot: unknown | null;
+  extractedSecurityContext: Record<string, unknown> | null;
   aiInsights: {
     browserIssuesExplanation: string;
     securityExplanation: string;
+    securityVulnerabilities: { vulnType: string; severity: 'Critical' | 'High' | 'Medium' | 'Low' | 'Info'; description: string; remediation?: string }[];
     performanceExplanation: string;
     axTreeExplanation: string;
     generatedAt: Date | null;
@@ -85,9 +87,21 @@ const pageSchema = new Schema<IPage>(
       type: Schema.Types.Mixed,
       default: null,
     },
+    extractedSecurityContext: {
+      type: Schema.Types.Mixed,
+      default: null,
+    },
     aiInsights: {
       browserIssuesExplanation: { type: String, default: '' },
       securityExplanation: { type: String, default: '' },
+      securityVulnerabilities: [
+        {
+          vulnType: { type: String, required: true },
+          severity: { type: String, enum: ['Critical', 'High', 'Medium', 'Low', 'Info'], required: true },
+          description: { type: String, required: true },
+          remediation: { type: String },
+        }
+      ],
       performanceExplanation: { type: String, default: '' },
       axTreeExplanation: { type: String, default: '' },
       generatedAt: { type: Date, default: null },

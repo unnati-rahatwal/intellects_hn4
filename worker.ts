@@ -1,5 +1,5 @@
 import dotenv from 'dotenv';
-dotenv.config();
+dotenv.config({ path: ['.env.local', '.env'] });
 import mongoose from 'mongoose';
 import { connectDB } from './lib/db';
 import { Scan } from './lib/models/scan';
@@ -139,6 +139,7 @@ async function processAiSynthesis() {
           securityHeaders: pageToAnalyze.securityHeaders as Record<string, unknown> | null,
           performanceMetrics: pageToAnalyze.performanceMetrics,
           axTreeSnippet,
+          extractedSecurityContext: pageToAnalyze.extractedSecurityContext as Record<string, unknown> | null,
         });
 
         await Page.findByIdAndUpdate(pageToAnalyze._id, {

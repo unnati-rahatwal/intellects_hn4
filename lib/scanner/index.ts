@@ -5,7 +5,7 @@ import { Scan } from '../models/scan';
 import { Page } from '../models/page';
 import { Violation, IViolation } from '../models/violation';
 import { discoverRoutes } from './route-discovery';
-import { analyzeSecurityHeaders } from './security';
+import { analyzeSecurityHeaders, extractSecurityContext } from './security';
 import {
   captureVisionDeficiencyScreenshots,
   getAccessibilityTree,
@@ -164,8 +164,10 @@ export async function runScan(
 
         // Security headers analysis
         let securityHeaders = null;
+        let extractedSecurityContext = null;
         if (options.securityAudit && response) {
           securityHeaders = analyzeSecurityHeaders(response.headers());
+          extractedSecurityContext = await extractSecurityContext(page);
         }
 
         // Parallel CDP Data Collection
@@ -353,6 +355,7 @@ export async function runScan(
           screenshotPath,
           stageScreenshots,
           securityHeaders,
+          extractedSecurityContext,
           loadTimeMs,
           performanceMetrics,
           browserIssues,
@@ -373,6 +376,14 @@ export async function runScan(
 
     // Finalize scan
     const avgScore = pagesScanned > 0 ? Math.round(totalScore / pagesScanned) : 0;
+    
+    // Aggregate security scores from pages
+    let avgSecurityScore = 100;
+    const pagesWithSecurity = await Page.find({ scanId, securityHeaders: { $ne: null } });
+    if (pagesWithSecurity.length > 0) {
+      const sum = pagesWithSecurity.reduce((acc, p) => acc + (p.securityHeaders?.score || 0), 0);
+      avgSecurityScore = Math.round(sum / pagesWithSecurity.length);
+    }
 
     const avg = (arr: number[]) => arr.length > 0 ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
     const performanceSummary = {
@@ -384,6 +395,7 @@ export async function runScan(
     await Scan.findByIdAndUpdate(scanId, {
       status: 'COMPLETED',
       accessibilityScore: avgScore,
+      securityScore: avgSecurityScore,
       totalViolations,
       criticalIssues: criticalCount,
       seriousIssues: seriousCount,

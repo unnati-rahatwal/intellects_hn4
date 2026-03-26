@@ -228,9 +228,11 @@ export async function generatePageInsights(pageData: {
   securityHeaders: Record<string, unknown> | null;
   performanceMetrics: Record<string, unknown> | null;
   axTreeSnippet: string;
-}): Promise<PageInsightsResult> {
+  extractedSecurityContext: Record<string, unknown> | null;
+}): Promise<PageInsightsResult & { securityVulnerabilities: any[] }> {
   const apiKey = process.env.FEATHERLESS_API_KEY;
-  const model = process.env.FEATHERLESS_SMALL_MODEL || 'Qwen/Qwen2.5-0.5B-Instruct';
+  // Use the larger model for security analysis to ensure high reasoning
+  const model = process.env.FEATHERLESS_LARGE_MODEL || 'Qwen/Qwen2.5-7B-Instruct';
 
   if (!apiKey || apiKey === 'your-key-here') {
     throw new Error('FEATHERLESS_API_KEY not configured');
@@ -250,10 +252,37 @@ ${JSON.stringify(pageData.performanceMetrics || {}, null, 2)}
 4. ACCESSIBILITY TREE SNIPPET (how assistive technology parses this page):
 ${pageData.axTreeSnippet}
 
-For each category, provide a 2-3 sentence explanation of what was found, what it means for users, and what should be improved. If a category has no data, say "No issues detected."
+5. DOM SECURITY CONTEXT (Extracted Forms, Scripts, Cookies, LocalStorage):
+${JSON.stringify(pageData.extractedSecurityContext || {}, null, 2)}
 
-CRITICAL: Output ONLY raw JSON matching this schema:
-{"browserIssuesExplanation": "string", "securityExplanation": "string", "performanceExplanation": "string", "axTreeExplanation": "string"}`;
+For BROWSER ISSUES, SECURITY HEADERS, PERFORMANCE, and ACCESSIBILITY, provide a brief 2-3 sentence explanation of what was found and what it means for users.
+
+**CRITICAL SECURITY AUDIT (DAST/SAST):**
+Analyze the "DOM SECURITY CONTEXT" deeply. Look for:
+- CSRF: Forms without anti-CSRF tokens (\`authenticity_token\`, \`csrf_token\`).
+- XSS: Inline scripts using \`eval()\`, \`innerHTML\`, or unsanitized state reflection.
+- SQL Injection: Identify forms or URL parameters that appear to trigger database-backed searches or filters. Look for client-side SQL string concatenation.
+- Encryption & Chat: If you detect WebSocket usage (\`ws://\`), flag it as "High" if not using \`wss://\`.
+- Exposed Secrets: API keys, JWTs, private keys, or "Admin" roles explicitly saved in \`localStorage\` or \`cookies\` that can be manipulated.
+- Weak Identity: \`sessionStorage\` or cookies storing raw user objects without \`HttpOnly\`.
+Extract these as specific vulnerabilities.
+
+For each category (Security, Performance, etc.), provide a 2-3 sentence explanation of what was found and what it means for users. If no data is found for a category, say "No issues detected."
+
+CRITICAL: Output ONLY raw JSON matching this schema precisely:
+{
+  "browserIssuesExplanation": "string",
+  "securityExplanation": "string",
+  "performanceExplanation": "string",
+  "axTreeExplanation": "string",
+  "securityVulnerabilities": [
+    {
+       "vulnType": "CSRF" | "XSS" | "IDOR" | "Sensitive Data Exposure" | "Broken Access Control",
+       "severity": "Critical" | "High" | "Medium" | "Low" | "Info",
+       "description": "Specific finding...", "remediation": "How to fix..."
+    }
+  ]
+}`;
 
   for (let attempt = 0; attempt < 2; attempt++) {
     const response = await fetch(FEATHERLESS_API_URL, {
@@ -286,8 +315,8 @@ CRITICAL: Output ONLY raw JSON matching this schema:
     const content = data.choices?.[0]?.message?.content || '';
 
     const parsed = tryParseJSON(content);
-    if (parsed && parsed.browserIssuesExplanation && parsed.securityExplanation) {
-      return parsed as PageInsightsResult;
+    if (parsed && parsed.browserIssuesExplanation && Array.isArray(parsed.securityVulnerabilities)) {
+      return parsed as PageInsightsResult & { securityVulnerabilities: any[] };
     }
   }
 

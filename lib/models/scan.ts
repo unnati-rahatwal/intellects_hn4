@@ -6,6 +6,7 @@ export interface IScan extends Document {
   projectId: mongoose.Types.ObjectId;
   status: ScanStatus;
   accessibilityScore: number;
+  securityScore: number;
   totalViolations: number;
   criticalIssues: number;
   seriousIssues: number;
@@ -59,6 +60,7 @@ const scanSchema = new Schema<IScan>(
       default: 'PENDING',
     },
     accessibilityScore: { type: Number, default: 0 },
+    securityScore: { type: Number, default: 0 },
     totalViolations: { type: Number, default: 0 },
     criticalIssues: { type: Number, default: 0 },
     seriousIssues: { type: Number, default: 0 },

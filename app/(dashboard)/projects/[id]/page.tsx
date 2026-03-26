@@ -4,7 +4,7 @@ import { useEffect, useState, use } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, ScanSearch, Trash2, Clock, CheckCircle, AlertTriangle, ArrowRight, Globe, GitCompare } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Legend } from 'recharts';
 
 interface Project {
   _id: string;
@@ -19,6 +19,7 @@ interface Scan {
   _id: string;
   status: string;
   accessibilityScore: number;
+  securityScore: number;
   totalViolations: number;
   criticalIssues: number;
   seriousIssues: number;
@@ -242,22 +243,25 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
       {scans.length > 0 && (
         <div className="glass-card bg-slate-900 border border-slate-800 rounded-2xl p-6 mb-8 mt-4">
           <h3 className="text-sm font-semibold text-slate-300 mb-4 flex items-center gap-2">
-            <ActivityIcon /> Accessibility Score Trend
+            <ActivityIcon /> Performance & Security Trends
           </h3>
           <div className="h-64 w-full">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={[...scans].filter(s => s.status === 'COMPLETED').reverse().map(s => ({
                 date: new Date(s.createdAt).toLocaleDateString(),
-                score: s.accessibilityScore
+                accessibility: s.accessibilityScore,
+                security: s.securityScore || 0
               }))}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
                 <XAxis dataKey="date" stroke="#94a3b8" fontSize={12} />
                 <YAxis stroke="#94a3b8" fontSize={12} domain={[0, 100]} />
                 <RechartsTooltip 
                   contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #1e293b', borderRadius: '8px' }}
-                  itemStyle={{ color: '#06b6d4', fontWeight: 'bold' }}
+                  itemStyle={{ fontSize: '12px', fontWeight: 'bold' }}
                 />
-                <Line type="monotone" dataKey="score" stroke="#06b6d4" strokeWidth={3} dot={{ r: 4, fill: '#06b6d4' }} activeDot={{ r: 6 }} />
+                <Legend verticalAlign="top" height={36}/>
+                <Line name="Accessibility" type="monotone" dataKey="accessibility" stroke="#06b6d4" strokeWidth={3} dot={{ r: 4, fill: '#06b6d4' }} activeDot={{ r: 6 }} />
+                <Line name="Security" type="monotone" dataKey="security" stroke="#10b981" strokeWidth={3} dot={{ r: 4, fill: '#10b981' }} activeDot={{ r: 6 }} />
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -280,7 +284,8 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
               <tr>
                 <th style={{ width: 40 }}></th>
                 <th>Status</th>
-                <th>Score</th>
+                <th>A11y</th>
+                <th>Security</th>
                 <th>Critical</th>
                 <th>Serious</th>
                 <th>Moderate</th>
@@ -312,6 +317,9 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                   </td>
                   <td style={{ fontWeight: 700, fontSize: 18, color: getScoreColor(scan.accessibilityScore) }}>
                     {scan.status === 'COMPLETED' ? scan.accessibilityScore : '—'}
+                  </td>
+                  <td style={{ fontWeight: 700, fontSize: 18, color: getScoreColor(scan.securityScore) }}>
+                    {scan.status === 'COMPLETED' ? (scan.securityScore || '100') : '—'}
                   </td>
                   <td><span className="badge badge-critical">{scan.criticalIssues}</span></td>
                   <td><span className="badge badge-serious">{scan.seriousIssues}</span></td>

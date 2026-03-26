@@ -67,6 +67,7 @@ interface PageAnalysis {
     browserIssuesExplanation?: string;
     securityExplanation?: string;
     axTreeExplanation?: string;
+    securityVulnerabilities?: { vulnType: string; severity: string; description: string; remediation?: string }[];
   };
   browserIssues?: {
     type: string;
@@ -129,6 +130,7 @@ interface ScanReport {
     targetUrls: string[];
     completedAt: string;
     accessibilityScore: number;
+    securityScore: number;
     totalViolations: number;
     criticalIssues: number;
     seriousIssues: number;
@@ -562,7 +564,7 @@ function ViolationCard({
                   alt={`Issue snapshot for ${violation.ruleId}`}
                   className="w-full max-h-56 object-contain bg-black/40 cursor-zoom-in"
                   loading="lazy"
-                  onClick={() => onPreview(violation?.screenshotPath, `Issue Snapshot: ${violation.ruleId}`)}
+                  onClick={() => violation.screenshotPath && onPreview(violation.screenshotPath, `Issue Snapshot: ${violation.ruleId}`)}
                 />
               </div>
             )}
@@ -586,7 +588,7 @@ function ViolationCard({
                 <div className="flex items-center justify-between mb-2">
                   <h4 className="text-xs font-semibold uppercase tracking-widest text-slate-500">Code Diff</h4>
                   <button
-                    onClick={() => handleCopy(ai?.remediatedCode)}
+                    onClick={() => ai?.remediatedCode && handleCopy(ai.remediatedCode)}
                     className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white px-2.5 py-1 rounded-md border border-slate-700 transition-all"
                   >
                     {copied ? (
@@ -601,11 +603,12 @@ function ViolationCard({
                   </button>
                 </div>
                 <div className="rounded-lg overflow-x-auto border border-slate-800 code-scroll">
-                  <ReactDiffViewer
-                    oldValue={violation.htmlSnippet}
-                    newValue={ai.remediatedCode}
-                    splitView={false}
-                    useDarkTheme={true}
+                  {ai && ai.remediatedCode && (
+                    <ReactDiffViewer
+                      oldValue={violation.htmlSnippet}
+                      newValue={ai.remediatedCode}
+                      splitView={false}
+                      useDarkTheme={true}
                     styles={{
                       variables: {
                         dark: {
@@ -621,6 +624,7 @@ function ViolationCard({
                       }
                     }}
                   />
+                  )}
                 </div>
               </div>
             </div>
@@ -828,14 +832,8 @@ export default function DetailedReportPage({ params }: { params: Promise<{ id: s
     ? Math.max(0, 100 - (scan.performanceSummary.avgFcp / 30)) 
     : 100;
 
-  // Security calculation
-  let secScore = 100;
-  if (pages.length > 0) {
-    const validPages = pages.filter(p => p.securityHeaders && typeof p.securityHeaders.score === 'number');
-    if (validPages.length > 0) {
-      secScore = Math.round(validPages.reduce((acc, p) => acc + p.securityHeaders.score, 0) / validPages.length);
-    }
-  }
+  // Security score from DB
+  const secScore = scan.securityScore || 100;
 
   const fullExecutiveSummary = scan.aiSummary?.executiveSummary || '';
   const summaryPreviewLimit = 160;
@@ -1289,7 +1287,7 @@ export default function DetailedReportPage({ params }: { params: Promise<{ id: s
                 ) : (
                   <p className="text-sm text-slate-500 italic">AI analysis pending...</p>
                 )}
-                {p.browserIssues?.length > 0 && (
+                {p.browserIssues && p.browserIssues.length > 0 && (
                   <p className="text-xs text-slate-500 mt-2">{p.browserIssues.length} raw issue(s) detected</p>
                 )}
               </div>
@@ -1321,9 +1319,11 @@ export default function DetailedReportPage({ params }: { params: Promise<{ id: s
               <div key={p._id} className="bg-slate-800/50 border border-slate-700/40 rounded-xl p-4">
                 <div className="flex items-center justify-between mb-3">
                   <p className="text-white font-medium text-sm truncate flex-1">{p.url}</p>
-                  <span className={`text-xs font-bold px-2 py-1 rounded-full ${p.securityHeaders.score >= 80 ? 'bg-green-500/20 text-green-400' : p.securityHeaders.score >= 50 ? 'bg-amber-500/20 text-amber-400' : 'bg-red-500/20 text-red-400'}`}>
-                    {p?.securityHeaders?.score}%
-                  </span>
+                  {p.securityHeaders && (
+                    <span className={`text-xs font-bold px-2 py-1 rounded-full ${p.securityHeaders.score >= 80 ? 'bg-green-500/20 text-green-400' : p.securityHeaders.score >= 50 ? 'bg-amber-500/20 text-amber-400' : 'bg-red-500/20 text-red-400'}`}>
+                      {p.securityHeaders.score}%
+                    </span>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mb-3">
@@ -1353,17 +1353,39 @@ export default function DetailedReportPage({ params }: { params: Promise<{ id: s
                       alt={`Page snapshot for ${p.url}`}
                       className="w-full max-h-64 object-contain bg-black/30 cursor-zoom-in"
                       loading="lazy"
-                      onClick={() => handlePreviewImage(p.screenshotPath, `Page Snapshot - ${p.url}`)}
+                      onClick={() => p.screenshotPath && handlePreviewImage(p.screenshotPath, `Page Snapshot - ${p.url}`)}
                     />
                   </div>
                 )}
 
                 {p.aiInsights?.securityExplanation && (
-                  <div className="bg-linear-to-r from-emerald-500/10 to-transparent rounded-lg p-3 border border-emerald-500/20">
+                  <div className="bg-linear-to-r from-emerald-500/10 to-transparent rounded-lg p-3 border border-emerald-500/20 mb-3">
                     <p className="text-sm text-slate-300 leading-relaxed flex gap-2">
                       <BrainCircuit className="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" />
                       {p.aiInsights.securityExplanation}
                     </p>
+                  </div>
+                )}
+
+                {p.aiInsights?.securityVulnerabilities && p.aiInsights.securityVulnerabilities.length > 0 && (
+                  <div className="space-y-2 mt-3 pt-3 border-t border-slate-700/50">
+                    <div className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-2">
+                      <AlertTriangle className="w-3 h-3 text-red-400" /> Detected Attack Vectors
+                    </div>
+                    {p.aiInsights.securityVulnerabilities.map((vuln: any, idx: number) => (
+                      <div key={idx} className="bg-slate-900/50 p-3 rounded-lg border border-red-500/20">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-sm font-bold text-red-400">{vuln.vulnType}</span>
+                          <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-sm bg-red-500/20 text-red-300">{vuln.severity}</span>
+                        </div>
+                        <p className="text-xs text-slate-300 mb-2">{vuln.description}</p>
+                        {vuln.remediation && (
+                          <p className="text-[11px] text-green-400 bg-green-950/30 p-2 rounded border border-green-900/50">
+                            <span className="font-bold">Fix:</span> {vuln.remediation}
+                          </p>
+                        )}
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>
@@ -1536,7 +1558,7 @@ export default function DetailedReportPage({ params }: { params: Promise<{ id: s
                             fill={SEVERITY_COLORS[impact]}
                             radius={[0, 0, 0, 0]}
                             className="cursor-pointer hover:opacity-80 transition-opacity"
-                            onClick={(data_obj: { fullUrl: string }) => {
+                            onClick={(data_obj: any) => {
                               if (data_obj && data_obj.fullUrl) {
                                 setSelectedViolationId(`drill:${data_obj.fullUrl}:${impact}`);
                               }
