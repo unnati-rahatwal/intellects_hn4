@@ -26,9 +26,11 @@ import {
   Layers,
   Download,
   Printer,
+  Copy,
+  Check,
   X
 } from 'lucide-react';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, Legend } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, Legend } from 'recharts';
 // @ts-ignore
 import ReactDiffViewer from 'react-diff-viewer-continued';
 
@@ -124,6 +126,13 @@ function ViolationCard({
   onPreview: (url: string, title: string) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const [copied, setCopied] = useState(false);
+  
+  const handleCopy = (text: string) => {
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
   const ai = violation.aiRemediation;
   const status = ai?.status || 'PENDING';
   const hasAi = status === 'GENERATED';
@@ -220,8 +229,24 @@ function ViolationCard({
                 </p>
               </div>
               <div>
-                <h4 className="text-xs font-semibold uppercase tracking-widest text-slate-500 mb-2">Code Diff</h4>
-                <div className="rounded-lg overflow-hidden border border-slate-800">
+                <div className="flex items-center justify-between mb-2">
+                  <h4 className="text-xs font-semibold uppercase tracking-widest text-slate-500">Code Diff</h4>
+                  <button
+                    onClick={() => handleCopy(ai.remediatedCode)}
+                    className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white px-2.5 py-1 rounded-md border border-slate-700 transition-all"
+                  >
+                    {copied ? (
+                      <>
+                        <Check className="w-3 h-3 text-green-400" /> Copied
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3 h-3" /> Copy Fixed Code
+                      </>
+                    )}
+                  </button>
+                </div>
+                <div className="rounded-lg overflow-x-auto border border-slate-800 code-scroll">
                   <ReactDiffViewer
                     oldValue={violation.htmlSnippet}
                     newValue={ai.remediatedCode}
@@ -803,7 +828,7 @@ export default function DetailedReportPage({ params }: { params: Promise<{ id: s
         </div>
 
         {/* AI Performance Explanation */}
-        {pages.some((p: any) => p.aiInsights?.performanceExplanation) && (
+        {pages.some((p: { aiInsights?: { performanceExplanation?: string } }) => p.aiInsights?.performanceExplanation) && (
           <div className="mt-6 bg-linear-to-r from-yellow-500/10 to-transparent border border-yellow-500/20 rounded-xl p-4">
             <h4 className="text-sm font-bold text-yellow-400 flex items-center gap-2 mb-2">
               <BrainCircuit className="w-4 h-4" /> AI Performance Analysis
@@ -1033,121 +1058,248 @@ export default function DetailedReportPage({ params }: { params: Promise<{ id: s
         )}
       </div>
 
-      {/* detailed Violations section */}
-      <div className="overflow-hidden">
-        <div className="flex items-center justify-between mb-6 border-b border-slate-800 pb-4">
-          <div>
-            <h2 className="text-2xl font-bold text-white flex items-center gap-2">
-              <FileText className="w-6 h-6 text-cyan-500" /> Organizational Violation Tree
-            </h2>
-            <p className="text-sm text-slate-400 mt-1">
-              Issues algorithmically structured by severity hierarchy.
-            </p>
-          </div>
-          <div className="text-sm border border-slate-700 bg-slate-800 px-3 py-1.5 rounded-lg text-slate-400 font-medium">
-            {violations.length} total entries
-          </div>
-        </div>
-
+      {/* Page-Level Violation Analytics - Stacked Bar Chart */}
+      <div className="overflow-hidden border border-slate-700/50 rounded-2xl p-6 bg-slate-900/30">
         <style dangerouslySetInnerHTML={{__html: `
-          .org-wrapper { overflow-x: auto; padding: 24px 20px 40px; display: block; border: 1px solid rgba(255,255,255,0.05); border-radius: 16px; background: rgba(15,23,42,0.4); }
-          .org-wrapper::-webkit-scrollbar { height: 8px; }
-          .org-wrapper::-webkit-scrollbar-track { background: transparent; }
-          .org-wrapper::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
-          .org-wrapper::-webkit-scrollbar-thumb:hover { background: #475569; }
-          .org-tree * { box-sizing: border-box; }
-          
-          /* Left to Right Tree CSS */
-          .org-tree { display: inline-flex; flex-direction: row; align-items: center; justify-content: flex-start; position: relative; margin: 0; min-width: max-content; }
-          .org-node { background: #0f172a; border: 2px solid rgba(255,255,255,0.1); padding: 12px 24px; border-radius: 12px; text-align: left; position: relative; z-index: 2; display: inline-block; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
-          .org-node-leaf { position: relative; z-index: 2; display: inline-block; cursor: pointer; transition: all 0.2s; }
-          .org-node-leaf:hover { transform: translateX(4px); }
-          
-          .org-children { display: flex; flex-direction: column; justify-content: center; padding-left: 40px; position: relative; gap: 16px; }
-          .org-children::before { content: ''; position: absolute; left: 0; top: 50%; width: 40px; border-top: 2px solid #334155; margin-top: -1px; }
-          
-          .org-child { position: relative; display: flex; flex-direction: row; align-items: center; }
-          .org-child::before { content: ''; position: absolute; left: -40px; top: 50%; width: 40px; border-top: 2px solid #334155; margin-top: -1px; }
-          .org-child::after { content: ''; position: absolute; left: -40px; top: 0; height: 100%; border-left: 2px solid #334155; margin-left: -1px; }
-          
-          .org-child:first-child::after { top: 50%; height: 50%; }
-          .org-child:last-child::after { height: 50%; }
-          .org-child:only-child::after { display: none; }
+          @keyframes slideInRight { 0% { opacity:0; transform:translateX(30px); } 100% { opacity:1; transform:translateX(0); } }
+          .animate-slide-in { animation: slideInRight 0.3s ease-out both; }
+          @keyframes fadeIn { 0% { opacity:0; } 100% { opacity:1; } }
+          .animate-fade-in { animation: fadeIn 0.25s ease-out both; }
+          .drilldown-scroll::-webkit-scrollbar { width: 5px; }
+          .drilldown-scroll::-webkit-scrollbar-track { background: transparent; }
+          .drilldown-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
+          .drilldown-scroll::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
+          .code-scroll::-webkit-scrollbar { height: 6px; }
+          .code-scroll::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); }
+          .code-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
+          .code-scroll::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
         `}} />
 
-        <div className="org-wrapper">
-          <div className="org-tree">
-            <div className="org-node" style={{ borderColor: '#22d3ee', boxShadow: '0 0 25px rgba(34,211,238,0.15)', textAlign: 'center' }}>
-               <div className="text-3xl mb-1">📄</div>
-               <div className="text-white font-black tracking-wide text-sm whitespace-nowrap">ROOT VIEW</div>
-               <div className="text-cyan-400 text-[10px] font-bold tracking-widest uppercase mt-1">{violations.length} Issues</div>
-            </div>
-            
-            <div className="org-children">
-              {(() => {
-                const groups = [
-                  { id: 'critical', title: 'CRITICAL', data: violations.filter(v => v.impact === 'critical'), color: { border: '#ef4444', bg: 'rgba(239,68,68,0.15)', text: '#ef4444' } },
-                  { id: 'serious', title: 'SERIOUS', data: violations.filter(v => v.impact === 'serious'), color: { border: '#f97316', bg: 'rgba(249,115,22,0.15)', text: '#f97316' } },
-                  { id: 'moderate', title: 'MODERATE', data: violations.filter(v => v.impact === 'moderate'), color: { border: '#eab308', bg: 'rgba(234,179,8,0.15)', text: '#eab308' } },
-                  { id: 'minor', title: 'MINOR', data: violations.filter(v => v.impact === 'minor'), color: { border: '#3b82f6', bg: 'rgba(59,130,246,0.15)', text: '#3b82f6' } }
-                ].filter(g => g.data.length > 0);
+        {(() => {
+          const SEVERITY_COLORS: Record<string, string> = { critical: '#ef4444', serious: '#f97316', moderate: '#eab308', minor: '#3b82f6' };
+          const SEVERITY_BG: Record<string, string> = { critical: 'rgba(239,68,68,0.15)', serious: 'rgba(249,115,22,0.15)', moderate: 'rgba(234,179,8,0.15)', minor: 'rgba(59,130,246,0.15)' };
+          const SEVERITY_LABELS: Record<string, string> = { critical: 'Critical', serious: 'Serious', moderate: 'Moderate', minor: 'Minor' };
 
-                return (
-                  <>
-                    {groups.map(g => (
-                      <div className="org-child" key={g.id}>
-                        <div className="org-node text-center whitespace-nowrap" style={{ borderColor: g.color.border, backgroundColor: g.color.bg }}>
-                          <div style={{ color: g.color.text }} className="font-extrabold text-sm tracking-widest">{g.title}</div>
-                          <div className="text-[10px] font-bold opacity-90 mt-1" style={{ color: g.color.text }}>{g.data.length} DETECTED</div>
-                        </div>
-                        <div className="org-children">
-                          {g.data.slice(0, 15).map((v: any, i: number) => (
-                            <div className="org-child" key={v._id}>
-                              <div 
-                                className="org-node-leaf text-left w-[260px] whitespace-normal rounded-xl bg-slate-900 border border-slate-700/50 p-3"
-                                onClick={() => setSelectedViolationId(selectedViolationId === v._id ? null : v._id)}
-                                style={{
-                                   borderColor: selectedViolationId === v._id ? g.color.text : 'rgba(255,255,255,0.1)',
-                                   boxShadow: selectedViolationId === v._id ? `0 0 15px ${g.color.bg}` : 'none'
-                                 }}
-                              >
-                                 <div className="flex items-start gap-3 mb-2">
-                                    <div className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0" style={{ backgroundColor: g.color.bg, color: g.color.text }}>
-                                      {i + 1}
-                                    </div>
-                                    <div className="text-xs font-bold text-white leading-tight break-words">{v.ruleId || v.type || 'Issue'}</div>
-                                 </div>
-                                 <div className="text-[11px] text-slate-400 line-clamp-2 leading-relaxed">{v.description || v.suggestion}</div>
-                              </div>
-                            </div>
-                          ))}
-                          {g.data.length > 15 && (
-                            <div className="org-child">
-                              <div className="org-node-leaf text-left w-[260px] whitespace-normal rounded-xl bg-slate-800/50 border border-slate-700/50 p-3 italic text-slate-500 text-xs text-center border-dashed">
-                                + {g.data.length - 15} more {g.title.toLowerCase()} issues
-                              </div>
-                            </div>
-                          )}
+          // Group violations by pageUrl
+          const grouped: Record<string, typeof violations> = {};
+          violations.forEach((v: any) => {
+            const key = v.pageUrl || 'Unknown';
+            if (!grouped[key]) grouped[key] = [];
+            grouped[key].push(v);
+          });
+
+          const barData = Object.entries(grouped).map(([url, items]) => {
+            let label = 'root';
+            try {
+              const u = new URL(url);
+              const parts = (u.pathname + u.hash).split(/[/#]/).filter(Boolean);
+              label = parts[parts.length - 1] || u.hostname;
+            } catch { label = url.split('/').filter(Boolean).pop() || url; }
+            return {
+              name: label.length > 18 ? label.substring(0, 16) + '..' : label,
+              fullUrl: url,
+              critical: items.filter(v => v.impact === 'critical').length,
+              serious: items.filter(v => v.impact === 'serious').length,
+              moderate: items.filter(v => v.impact === 'moderate').length,
+              minor: items.filter(v => v.impact === 'minor').length,
+            };
+          });
+
+          // Check if we're in drill-down mode
+          const isDrillDown = selectedViolationId?.startsWith('drill:');
+          let drillUrl = '';
+          let drillImpact = '';
+          let detailId: string | null = null;
+
+          if (isDrillDown && selectedViolationId) {
+            const raw = selectedViolationId;
+            // Extract detail ID if present
+            if (raw.includes('|detail:')) {
+              detailId = raw.split('|detail:')[1];
+            }
+            const base = raw.split('|detail:')[0]; // drill:url:impact
+            const colonParts = base.split(':');
+            drillImpact = colonParts[colonParts.length - 1];
+            drillUrl = colonParts.slice(1, -1).join(':');
+          }
+
+          const drillViolations = isDrillDown
+            ? violations.filter((v: any) => v.pageUrl === drillUrl && v.impact === drillImpact)
+            : [];
+
+          const setDetailId = (id: string | null) => {
+            if (id) setSelectedViolationId(`drill:${drillUrl}:${drillImpact}|detail:${id}`);
+            else setSelectedViolationId(`drill:${drillUrl}:${drillImpact}`);
+          };
+
+          // ============ CHART VIEW ============
+          if (!isDrillDown) {
+            return (
+              <>
+                <div className="flex items-center justify-between mb-6 border-b border-slate-800 pb-4">
+                  <div>
+                    <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+                      <Layers className="w-6 h-6 text-cyan-500" /> Page-Level Violation Analytics
+                    </h2>
+                    <p className="text-sm text-slate-400 mt-1">
+                      Interactive stacked chart — click any colored segment to see issues.
+                    </p>
+                  </div>
+                  <div className="text-sm border border-slate-700 bg-slate-800 px-3 py-1.5 rounded-lg text-slate-400 font-medium">
+                    {violations.length} total issues · {barData.length} pages
+                  </div>
+                </div>
+                {barData.length > 0 ? (
+                  <div className="w-full" style={{ height: Math.max(450, barData.length * 60 + 160) + 'px', minHeight: '450px' }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={barData} margin={{ top: 20, right: 30, left: 20, bottom: 70 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                        <XAxis
+                          dataKey="name"
+                          stroke="#94a3b8"
+                          fontSize={12}
+                          fontWeight={600}
+                          tickLine={false}
+                          axisLine={false}
+                          interval={0}
+                          angle={-30}
+                          textAnchor="end"
+                          height={70}
+                        />
+                        <YAxis stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} allowDecimals={false} />
+                        <RechartsTooltip
+                          contentStyle={{ backgroundColor: '#0f172a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', padding: '12px' }}
+                          itemStyle={{ fontSize: '12px', fontWeight: 'bold' }}
+                          labelStyle={{ color: '#fff', fontWeight: 'bold', marginBottom: '4px' }}
+                          cursor={{ fill: 'rgba(255,255,255,0.03)' }}
+                        />
+                        <Legend verticalAlign="top" height={36} iconType="circle" />
+                        {(['critical', 'serious', 'moderate', 'minor'] as const).map((sev, i) => (
+                          <Bar
+                            key={sev}
+                            dataKey={sev}
+                            name={SEVERITY_LABELS[sev]}
+                            stackId="a"
+                            fill={SEVERITY_COLORS[sev]}
+                            radius={i === 3 ? [4, 4, 0, 0] : [0, 0, 0, 0]}
+                            onClick={(data: any) => {
+                              if (data && data[sev] > 0) {
+                                setSelectedViolationId(`drill:${data.fullUrl}:${sev}`);
+                              }
+                            }}
+                            className="cursor-pointer transition-opacity hover:opacity-80"
+                          />
+                        ))}
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                ) : (
+                  <div className="h-64 flex items-center justify-center border border-white/5 bg-white/5 rounded-xl">
+                    <p className="text-slate-500 text-sm">No violations detected for this scan.</p>
+                  </div>
+                )}
+              </>
+            );
+          }
+
+          // ============ DRILL-DOWN VIEW (inline, replaces chart) ============
+          let pageLabel = drillUrl;
+          try {
+            const u = new URL(drillUrl);
+            pageLabel = u.pathname + (u.hash || '');
+            if (pageLabel === '/') pageLabel = u.hostname;
+          } catch { /* keep raw */ }
+
+          return (
+            <div className="animate-slide-in">
+              {/* Header with back button + page name */}
+              <div className="flex items-center gap-4 mb-5 pb-4 border-b border-slate-800">
+                <button
+                  onClick={() => setSelectedViolationId(null)}
+                  className="flex items-center gap-2 text-sm font-semibold text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 pl-3 pr-4 py-2 rounded-xl transition-all border border-slate-700 hover:border-slate-500 shrink-0"
+                >
+                  <ArrowLeft className="w-4 h-4" /> Back to Chart
+                </button>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <Globe className="w-5 h-5 text-cyan-400 shrink-0" />
+                    <h2 className="text-xl font-bold text-white truncate">{pageLabel}</h2>
+                    <span
+                      className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider shrink-0"
+                      style={{ backgroundColor: SEVERITY_BG[drillImpact], color: SEVERITY_COLORS[drillImpact] }}
+                    >
+                      <span className="w-2 h-2 rounded-full" style={{ backgroundColor: SEVERITY_COLORS[drillImpact] }} />
+                      {drillImpact} · {drillViolations.length} issues
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-1 font-mono truncate">{drillUrl}</p>
+                </div>
+              </div>
+
+              {/* Split panel: list + detail */}
+              <div className="flex gap-0 border border-white/5 rounded-2xl overflow-hidden bg-slate-900/50" style={{ minHeight: '560px' }}>
+                {/* Left: Issue List */}
+                <div className={`${detailId ? 'w-[38%] border-r border-white/5' : 'w-full'} overflow-y-auto drilldown-scroll transition-all`} style={{ maxHeight: '600px' }}>
+                  <div className="p-3 space-y-1.5">
+                    {drillViolations.map((v: any, idx: number) => (
+                      <div
+                        key={v._id}
+                        onClick={() => setDetailId(detailId === v._id ? null : v._id)}
+                        className={`group p-3.5 rounded-xl cursor-pointer transition-all border ${
+                          detailId === v._id
+                            ? 'border-l-2 bg-white/[0.06]'
+                            : 'border-transparent hover:bg-white/[0.03]'
+                        }`}
+                        style={detailId === v._id ? { borderLeftColor: SEVERITY_COLORS[drillImpact] } : {}}
+                      >
+                        <div className="flex items-start gap-3">
+                          <span
+                            className="text-[10px] font-bold rounded-md w-6 h-6 flex items-center justify-center shrink-0"
+                            style={{ backgroundColor: SEVERITY_BG[drillImpact], color: SEVERITY_COLORS[drillImpact] }}
+                          >
+                            {idx + 1}
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-semibold text-white group-hover:text-cyan-300 transition-colors">{v.ruleId}</p>
+                            <p className="text-xs text-slate-400 mt-0.5 line-clamp-2">{v.description}</p>
+                          </div>
+                          <ChevronDown className={`w-4 h-4 text-slate-600 shrink-0 mt-0.5 transition-transform ${detailId === v._id ? 'rotate-180 text-slate-300' : ''}`} />
                         </div>
                       </div>
                     ))}
-                  </>
-                );
-              })()}
-            </div>
-          </div>
-        </div>
+                    {drillViolations.length === 0 && (
+                      <div className="text-center py-12 text-slate-500 text-sm">No issues found for this selection.</div>
+                    )}
+                  </div>
+                </div>
 
-        {/* Selected Issue Full Detail View */}
-        {selectedViolationId && (
-           <div className="mt-8 border border-slate-700/50 bg-slate-900/50 rounded-2xl p-6 animate-fade-in shadow-2xl relative">
-              <div className="flex items-center justify-between mb-4 pb-4 border-b border-slate-800">
-                 <h3 className="text-xl font-bold text-white flex items-center gap-2"><FileText className="w-5 h-5 text-cyan-400"/> Issue Deep Dive</h3>
-                 <button onClick={() => setSelectedViolationId(null)} className="flex items-center gap-2 text-xs font-bold text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded-lg transition-colors border border-slate-700"><X className="w-4 h-4"/> Close Display</button>
+                {/* Right: Detail Panel */}
+                {detailId && (() => {
+                  const detail = violations.find((v: any) => v._id === detailId);
+                  if (!detail) return null;
+                  return (
+                    <div className="w-[62%] overflow-y-auto drilldown-scroll animate-slide-in" style={{ maxHeight: '600px' }}>
+                      <div className="p-5">
+                        <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-800">
+                          <h3 className="text-base font-bold text-white flex items-center gap-2">
+                            <FileText className="w-4 h-4 text-cyan-400" /> Issue Details
+                          </h3>
+                          <button
+                            onClick={() => setDetailId(null)}
+                            className="text-xs text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 px-2.5 py-1 rounded-lg transition-colors border border-slate-700 flex items-center gap-1"
+                          >
+                            <X className="w-3.5 h-3.5" /> Close
+                          </button>
+                        </div>
+                        <ViolationCard violation={detail} onPreview={handlePreviewImage} />
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
-              <ViolationCard violation={violations.find((v: any) => v._id === selectedViolationId)} onPreview={handlePreviewImage} />
-           </div>
-        )}
+            </div>
+          );
+        })()}
       </div>
 
       {previewImage && typeof window !== 'undefined' && createPortal(
