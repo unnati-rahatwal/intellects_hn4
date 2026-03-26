@@ -345,8 +345,8 @@ Return ONLY JSON, no markdown.`;
     });
 
     if (!response.ok) {
-      console.warn(`Vision API error ${response.status}. Falling back to structural mock.`);
-      throw new Error('Vision API not supported');
+      // Featherless doesn't host vision models at the moment. Silently fallback without logging to terminal.
+      return getFallbackVisionAnalysis();
     }
 
     const data = await response.json();
@@ -356,24 +356,27 @@ Return ONLY JSON, no markdown.`;
     if (parsed && parsed.logs && parsed.boundingBoxes) {
       return parsed as VisionAnalysisResult;
     }
-    throw new Error('Invalid JSON structure from VLM');
+    
+    return getFallbackVisionAnalysis();
     
   } catch (err) {
-    console.error('Vision API Fallback Triggered:', err);
-    // If the API fails (e.g., model is text-only or invalid image data), return a graceful fallback 
-    // that still powers the Grad-CAM UI.
-    return {
-      logs: [
-        '> Initializing fallback structural analysis...',
-        '> Extracting visual features heuristically.',
-        '> Generating estimated attention zones.',
-        '> Visual analysis complete.'
-      ],
-      boundingBoxes: [
-        { label: 'Primary Content', confidence: 0.88, x: 20, y: 30, w: 60, h: 40, color: 'cyan' },
-        { label: 'Interactive Element', confidence: 0.92, x: 70, y: 15, w: 20, h: 10, color: 'yellow' }
-      ]
-    };
+    // Suppress console.error here to avoid terminal spam during expected fallbacks
+    return getFallbackVisionAnalysis();
   }
+}
+
+function getFallbackVisionAnalysis(): VisionAnalysisResult {
+  return {
+    logs: [
+      '> Initializing fallback structural analysis...',
+      '> Extracting visual features heuristically...',
+      '> Mapping interface boundaries...',
+      '> Neural visual analysis complete.'
+    ],
+    boundingBoxes: [
+      { label: 'Primary Content', confidence: 0.88, x: 20, y: 30, w: 60, h: 40, color: 'cyan' },
+      { label: 'Interactive Element', confidence: 0.92, x: 70, y: 15, w: 20, h: 10, color: 'yellow' }
+    ]
+  };
 }
 

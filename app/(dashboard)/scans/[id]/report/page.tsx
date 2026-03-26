@@ -36,6 +36,69 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, PieChart, Pie, Cell, Respon
 // @ts-ignore
 import ReactDiffViewer from 'react-diff-viewer-continued';
 
+interface BoundingBox {
+  label: string;
+  confidence: number;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  color?: string;
+}
+
+interface PageAnalysis {
+  _id: string;
+  url: string;
+  accessibilityScore: number;
+  violationCount: number;
+  loadTimeMs: number;
+  screenshotPath?: string;
+  createdAt: string;
+  performanceMetrics?: {
+    FirstContentfulPaint: number;
+    LargestContentfulPaint: number;
+    CumulativeLayoutShift: number;
+    TotalBlockingTime: number;
+    InteractionToNextPaint?: number;
+  };
+  aiInsights?: {
+    performanceExplanation?: string;
+  };
+  stageScreenshots?: {
+    stage: string;
+    imageData: string;
+    capturedAt: string;
+  }[];
+}
+
+interface ViolationNode {
+  html: string;
+  target: string[];
+  failureSummary?: string;
+}
+
+interface Violation {
+  _id: string;
+  id: string;
+  ruleId: string;
+  impact: 'critical' | 'serious' | 'moderate' | 'minor';
+  help: string;
+  description: string;
+  nodes: ViolationNode[];
+  tags: string[];
+  pageUrl?: string;
+  cssSelector?: string;
+  htmlSnippet?: string;
+  screenshotPath?: string;
+  failureSummary?: string;
+  aiRemediation?: {
+    status: 'PENDING' | 'GENERATED' | 'FAILED';
+    analysis: string;
+    explanation: string;
+    remediatedCode: string;
+  };
+}
+
 interface ScanReport {
   scan: {
     _id: string;
@@ -60,8 +123,8 @@ interface ScanReport {
     };
     pagesScanned?: number;
   };
-  pages: any[];
-  violations: any[];
+  pages: PageAnalysis[];
+  violations: Violation[];
 }
 
 const SEVERITY_COLORS = {
@@ -91,7 +154,7 @@ function GradCamModal({
   const [scanProgress, setScanProgress] = useState(0);
   const [scanPhase, setScanPhase] = useState<'initializing' | 'scanning' | 'analyzing' | 'complete'>('initializing');
   const [analysisLogs, setAnalysisLogs] = useState<{ time: string; msg: string; type: 'info' | 'warn' | 'error' | 'success' }[]>([]);
-  const [boundingBoxes, setBoundingBoxes] = useState<{ x: number; y: number; width: number; height: number; confidence: number; label: string }[]>([]);
+  const [boundingBoxes, setBoundingBoxes] = useState<BoundingBox[]>([]);
 
   useEffect(() => {
     // Prevent background scrolling
@@ -121,10 +184,38 @@ function GradCamModal({
       setScanProgress(45);
 
       try {
+        // Compress image before sending to VLM to avoid 413 Payload Too Large
+        const resizedImage = await new Promise<string>((resolve) => {
+          const img = new window.Image();
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            const MAX_DIM = 800;
+            let { width, height } = img;
+            if (width > height && width > MAX_DIM) {
+              height = Math.round((height * MAX_DIM) / width);
+              width = MAX_DIM;
+            } else if (height > MAX_DIM) {
+              width = Math.round((width * MAX_DIM) / height);
+              height = MAX_DIM;
+            }
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+              ctx.drawImage(img, 0, 0, width, height);
+              resolve(canvas.toDataURL('image/jpeg', 0.6));
+            } else {
+              resolve(imageUrl);
+            }
+          };
+          img.onerror = () => resolve(imageUrl);
+          img.src = imageUrl;
+        });
+
         const res = await fetch('/api/vision', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ imageUrl })
+          body: JSON.stringify({ imageUrl: resizedImage })
         });
         
         if (!res.ok) throw new Error(`Vision API failed: ${res.statusText}`);
@@ -168,7 +259,7 @@ function GradCamModal({
 
   return (
     <div
-      className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-xl flex items-center justify-center p-4 print:hidden"
+      className="fixed inset-0 z-100 bg-black/95 backdrop-blur-xl flex items-center justify-center p-4 print:hidden"
       onClick={onClose}
     >
       <div 
@@ -201,9 +292,9 @@ function GradCamModal({
                 scanPhase !== 'complete' ? 'opacity-80' : 'opacity-30'
               }`}
               style={{
-                background: scanPhase === 'complete' 
-                  ? 'radial-gradient(circle at 50% 50%, rgba(2ef0ff,0.1) 0%, transparent 70%)'
-                  : 'repeating-linear-gradient(0deg, rgba(2ef0ff,0.05) 0px, rgba(2ef0ff,0.05) 1px, transparent 1px, transparent 4px)',
+                backgroundImage: scanPhase === 'complete' 
+                  ? 'radial-gradient(circle at 50% 50%, rgba(34,211,238,0.1) 0%, transparent 70%)'
+                  : 'repeating-linear-gradient(0deg, rgba(34,211,238,0.05) 0px, rgba(34,211,238,0.05) 1px, transparent 1px, transparent 4px)',
                 backgroundSize: '100% 4px'
               }}
             />
@@ -216,8 +307,8 @@ function GradCamModal({
                 style={{
                   left: `${Math.max(0, Math.min(100, box.x))}%`,
                   top: `${Math.max(0, Math.min(100, box.y))}%`,
-                  width: `${Math.max(1, Math.min(100, box.width))}%`,
-                  height: `${Math.max(1, Math.min(100, box.height))}%`,
+                  width: `${Math.max(1, Math.min(100, box.w))}%`,
+                  height: `${Math.max(1, Math.min(100, box.h))}%`,
                 }}
               >
                 <span className="absolute -top-6 left-0 bg-red-600 text-white text-[10px] font-mono px-1.5 py-0.5 rounded-sm whitespace-nowrap shadow-md">
@@ -361,7 +452,7 @@ function ViolationCard({
   violation,
   onPreview,
 }: {
-  violation: any;
+  violation: Violation;
   onPreview: (url: string, title: string) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
@@ -828,9 +919,9 @@ export default function DetailedReportPage({ params }: { params: Promise<{ id: s
                     Your browser does not support embedded video playback.
                   </video>
                 ) : (
-                  // eslint-disable-next-line jsx-a11y/iframe-has-title
                   <iframe
                     src={videoUrl}
+                    title="Scan Stage Video"
                     className="w-full h-full"
                     allow="autoplay; encrypted-media"
                     allowFullScreen
@@ -1073,7 +1164,7 @@ export default function DetailedReportPage({ params }: { params: Promise<{ id: s
               <BrainCircuit className="w-4 h-4" /> AI Performance Analysis
             </h4>
             <p className="text-sm text-slate-300 leading-relaxed">
-              {pages.find((p: any) => p.aiInsights?.performanceExplanation)?.aiInsights?.performanceExplanation}
+              {pages.find((p: PageAnalysis) => p.aiInsights?.performanceExplanation)?.aiInsights?.performanceExplanation}
             </p>
           </div>
         )}
@@ -1087,7 +1178,7 @@ export default function DetailedReportPage({ params }: { params: Promise<{ id: s
         <p className="text-sm text-slate-400 mb-6">Individual accessibility and performance scores for each analyzed URL</p>
         
         <div className="space-y-3">
-          {pages.map((p: any) => (
+          {pages.map((p: PageAnalysis) => (
             <div key={p._id} className="bg-slate-800/50 border border-slate-700/40 rounded-xl p-4 hover:border-slate-600/60 transition-colors">
               {(() => {
                 const stageShots = Array.isArray(p.stageScreenshots) && p.stageScreenshots.length > 0
@@ -1119,7 +1210,7 @@ export default function DetailedReportPage({ params }: { params: Promise<{ id: s
                 <div className="mt-4 border-t border-slate-700/50 pt-4">
                   <div className="text-xs text-slate-400 mb-3">Scan Stage Snapshots</div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {stageShots.map((shot: any, idx: number) => (
+                    {stageShots.map((shot: { stage: string; imageData: string; capturedAt: string }, idx: number) => (
                       <div key={`${p._id}-stage-${idx}`} className="bg-slate-900/70 border border-slate-700 rounded-lg overflow-hidden">
                         <div className="px-2 py-1.5 text-[11px] font-medium text-slate-300 border-b border-slate-700">
                           {STAGE_LABELS[shot.stage] || shot.stage}
@@ -1480,7 +1571,7 @@ export default function DetailedReportPage({ params }: { params: Promise<{ id: s
                 {/* Left: Issue List */}
                 <div className={`${detailId ? 'w-[38%] border-r border-white/5' : 'w-full'} overflow-y-auto drilldown-scroll transition-all`} style={{ maxHeight: '600px' }}>
                   <div className="p-3 space-y-1.5">
-                    {drillViolations.map((v: any, idx: number) => (
+                    {drillViolations.map((v: Violation, idx: number) => (
                       <div
                         key={v._id}
                         onClick={() => setDetailId(detailId === v._id ? null : v._id)}
@@ -1514,7 +1605,7 @@ export default function DetailedReportPage({ params }: { params: Promise<{ id: s
 
                 {/* Right: Detail Panel */}
                 {detailId && (() => {
-                  const detail = violations.find((v: any) => v._id === detailId);
+                  const detail = violations.find((v: Violation) => v._id === detailId);
                   if (!detail) return null;
                   return (
                     <div className="w-[62%] overflow-y-auto drilldown-scroll animate-slide-in" style={{ maxHeight: '600px' }}>
